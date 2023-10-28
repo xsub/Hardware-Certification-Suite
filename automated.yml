@@ -11,12 +11,12 @@
   tasks:
 
     #GENERAL SETUP
-    - tags: [logs_folder, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits]
+    - tags: [logs_folder, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits, isv-mariadb ]
       block:
         - name: Create logs dir
           local_action: file path="{{ lts_logs_dir }}" state="directory" mode="0755"
 
-    - tags: [tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits]
+    - tags: [tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits isv-mariadb ]
       block:
         - name: Copy tests
           copy:
@@ -77,6 +77,12 @@
       block:
         - include: "{{ lts_tests_dir }}/cllimits/roles/main.yml"
       when: ansible_distribution != 'AlmaLinux'
+
+    # MariaDB-Test
+    - tags: [ 'never', 'isv-mariadb' ]
+      block:
+        - include: "{{ lts_tests_dir }}/isv-mariadb/roles/main.yml"
+
 
     ##########
 

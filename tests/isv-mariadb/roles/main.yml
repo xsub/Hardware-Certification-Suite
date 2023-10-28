@@ -1,7 +1,9 @@
 ---
 - name: TEST MariaDB - install mariadb-test package
   dnf:
-    name: mariadb-test
+    name:
+      - mariadb
+      - mariadb-test
     state: present
     update_cache: True
 
@@ -15,6 +17,7 @@
 
 - name: TEST MariaDB - cleanup package
   dnf:
-    name: mariadb-test
+    name:
+      - mariadb
+      - mariadb-test
     state: absent
-
