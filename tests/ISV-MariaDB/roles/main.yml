@@ -1,0 +1,20 @@
+---
+- name: TEST MariaDB - install mariadb-test package
+  dnf:
+    name: mariadb-test
+    state: present
+    update_cache: True
+
+- name: TEST MariaDB - run tests
+  shell: "cd /usr/share/mysql-test; ./mysql-test-run.pl"
+  register: output
+  ignore_errors: true
+
+- name: TEST MariaDB - copy log
+  local_action: copy content="{{ output.stdout }}" dest="{{ mariadb_logs_dir }}/mariadb.log"
+
+- name: TEST MariaDB - cleanup package
+  dnf:
+    name: mariadb-test
+    state: absent
+
