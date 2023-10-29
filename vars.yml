@@ -42,4 +42,4 @@ test_ltp:
 
 #ISV-MariaDB
 test_isv-mariadb:
-
+  params: "" # This is to express the intent that we want MariaDB Foundation's team to help us parametrize the mariadb-test runner.
