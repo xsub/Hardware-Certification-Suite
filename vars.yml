@@ -42,5 +42,4 @@ test_ltp:
 
 #ISV-MariaDB
 test_isv-mariadb:
-  mariadb_logs_dir: "{{ lts_logs_dir }}"
 
