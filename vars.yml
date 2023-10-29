@@ -41,4 +41,6 @@ test_ltp:
   suites: "{{ ltp_suites|default('all') }}"
 
 #ISV-MariaDB
-#test_isv-mariadb:
+test_isv-mariadb:
+  mariadb_logs_dir: "{{ lts_logs_dir }}"
+

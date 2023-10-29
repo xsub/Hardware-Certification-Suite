@@ -1,0 +1,65 @@
+pawel@localhost ~/_DEV/HCS-dev $ sudo ansible-playbook -i 10.0.0.23, automated.yml --tags isv-mariadb
+Place your finger on the fingerprint reader
+[DEPRECATION WARNING]: "include" is deprecated, use include_tasks/import_tasks instead. See https://docs.ansible.com/ansible-
+core/2.14/user_guide/playbooks_reuse_includes.html for details. This feature will be removed in version 2.16. Deprecation warnings can be disabled by setting 
+deprecation_warnings=False in ansible.cfg.
+
+PLAY [Hardware certification] ***********************************************************************************************************************************************
+
+TASK [Gathering Facts] ******************************************************************************************************************************************************
+ok: [10.0.0.23]
+
+TASK [Create logs dir] ******************************************************************************************************************************************************
+changed: [10.0.0.23 -> localhost]
+
+TASK [include] **************************************************************************************************************************************************************
+[DEPRECATION WARNING]: "include" is deprecated, use include_tasks/import_tasks/import_playbook instead. This feature will be removed in version 2.16. Deprecation warnings 
+can be disabled by setting deprecation_warnings=False in ansible.cfg.
+included: /home/pawel/_DEV/HCS-dev/tests/containers/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/cpu/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/hw_detection/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/kvm/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/network/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/raid/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/ltp/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/phoronix/roles/main.yml for 10.0.0.23
+
+TASK [include] **************************************************************************************************************************************************************
+skipping: [10.0.0.23]
+
+TASK [include] **************************************************************************************************************************************************************
+included: /home/pawel/_DEV/HCS-dev/tests/isv-mariadb/roles/main.yml for 10.0.0.23
+
+TASK [TEST MariaDB - install mariadb-test package] **************************************************************************************************************************
+changed: [10.0.0.23]
+
+TASK [TEST MariaDB - run tests] *********************************************************************************************************************************************
+fatal: [10.0.0.23]: FAILED! => {"changed": true, "cmd": "cd /usr/share/mysql-test; ./mysql-test-run.pl", "delta": "1:16:50.364966", "end": "2023-10-29 03:54:59.191759", "msg": "non-zero return code", "rc": 1, "start": "2023-10-29 02:38:08.826793", "stderr": "worker[1] mysql-test-run: WARNING: running this script as _root_ will cause some tests to be skipped\nmysql-test-run: *** ERROR: there were failing test cases", "stderr_lines": ["worker[1] mysql-test-run: WARNING: running this script as _root_ will cause some tests to be skipped", "mysql-test-run: *** ERROR: there were failing test cases"], "stdout": "Logging: ./mysql-test-run.pl  \nVS config: \nvardir: /usr/share/mysql-test/var\nChecking leftover processes...\nRemoving old var directory...\nCreating var directory '/usr/share/mysql-test/var'...\nChecking supported features...\nMariaDB Version 10.5.22-MariaDB\n - SSL connections supported\n - binaries built with wsrep patch\nUsing suites: main-,archive-,binlog-,binlog_encryption-,client-,csv-,compat/oracle-,compat/mssql-,compat/maxdb-,encryption-,federated-,funcs_1-,funcs_2-,gcol-,handler-,heap-,innodb-,innodb_fts-,innodb_gis-,innodb_i_s-,innodb_zip-,json-,maria-,mariabackup-,multi_source-,optimizer_unfixed_bugs-,parts-,perfschema-,plugins-,roles-,rpl-,stress-,sys_vars-,sql_sequence-,unit-,vcol-,versioning-,period-,disks,func_test,metadata_lock_info,query_response_time,sequence,spider,spider/bg,spider/bugfix,spider/feature,spider/handler,spider/regression/e1121,spider/regression/e112122,sql_discovery,type_inet,type_test,user_variables\nCollecting tests...\nInstalling system database...\n\n==============================================================================\n\nTEST                                      RESULT   TIME (ms) or COMMENT\n--------------------------------------------------------------------------\n\nworker[1] Using MTR_BUILD_THREAD 300, with reserved ports 16000..16019\nmariabackup.mdev-14447                   [ skipped ]  Test needs --big-test\nspider/bugfix.mdev_29904                 [ disabled ]  MDEV-31101\nspider/bugfix.wait_timeout               [ disabled ]  MDEV-26045\narchive.archive-big                      [ skipped ]  Test needs --big-test\nbinlog.flashback-largebinlog             [ skipped ]  Test needs --big-test\nbinlog_encryption.encrypted_master_lost_key [ disabled ]  MDEV-11323 - unspecified behavior for IO thread\nbinlog_encryption.rpl_checksum_cache     [ disabled ]  MDEV-11486 - sporadic failure in IO thread\nencryption.create_or_replace_big         [ skipped ]  Test needs --big-test\nfederated.federated_server               [ skipped ]  Test needs --big-test\nfuncs_1.myisam_views-big                 [ skipped ]  Test needs --big-test\ngcol.innodb_virtual_basic                [ skipped ]  Test needs --big-test\ninnodb.alter_large_dml                   [ skipped ]  Test needs --big-test\ninnodb.create-index-debug                [ disabled ]  MDEV-13680 InnoDB may crash when btr_page_alloc() fails\ninnodb.doublewrite                       [ skipped ]  Test needs --big-test\ninnodb.full_crc32_import                 [ skipped ]  Test needs --big-test\ninnodb.innodb-alter-table                [ skipped ]  Test needs --big-test\ninnodb.innodb-bigblob                    [ skipped ]  Test needs --big-test\ninnodb.innodb-change-buffer-recovery     [ skipped ]  Test needs --big-test\ninnodb.innodb-index-debug                [ skipped ]  Test needs --big-test\ninnodb.innodb-wl5522-debug               [ skipped ]  Test needs --big-test\ninnodb.innodb_buffer_pool_resize         [ skipped ]  Test needs --big-test\ninnodb.innodb_buffer_pool_resize_with_chunks [ skipped ]  Test needs --big-test\ninnodb.innodb_bulk_create_index          [ skipped ]  Test needs --big-test\ninnodb.innodb_bulk_create_index_debug    [ skipped ]  Test needs --big-test\ninnodb.innodb_defrag_binlog              [ skipped ]  Test needs --big-test\ninnodb.innodb_defrag_concurrent          [ skipped ]  Test needs --big-test\ninnodb.innodb_defrag_stats_many_tables   [ skipped ]  Test needs --big-test\ninnodb.innodb_defragm
+...ignoring
+
+TASK [TEST MariaDB - copy log] **********************************************************************************************************************************************
+fatal: [10.0.0.23 -> localhost]: FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'mariadb_logs_dir' is undefined. 'mariadb_logs_dir' is undefined\n\nThe error appears to be in '/home/pawel/_DEV/HCS-dev/tests/isv-mariadb/roles/main.yml': line 15, column 3, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n- name: TEST MariaDB - copy log\n  ^ here\n"}
+...ignoring
+
+TASK [TEST MariaDB - cleanup package] ***************************************************************************************************************************************
+changed: [10.0.0.23]
+
+PLAY RECAP ******************************************************************************************************************************************************************
+10.0.0.23                  : ok=15   changed=4    unreachable=0    failed=0    skipped=1    rescued=0    ignored=2   
+
+pawel@localhost ~/_DEV/HCS-dev $ 
+
