@@ -1,0 +1,122 @@
+# Changelog
+
+## 2026-06-01 - xsub fork development delta
+
+This entry summarizes the work currently present in the
+`xsub/Hardware-Certification-Suite` fork compared with
+`AlmaLinux/Hardware-Certification-Suite` upstream `main`.
+
+### Runner and user experience
+
+- Added a Python/Rich runner package under `hcs/`.
+- Added runner commands for listing profiles, listing tests, and running test
+  plans through Ansible.
+- Added Rich progress output with a visible suite plan, current pass, current
+  step, overall progress, and final run summary.
+- Added built-in run profiles:
+  `check`, `short`, `medium`, `long`, `very_long`, and `extreme`.
+- Added runner support for selected tests, repeated passes, dry-runs,
+  stop-on-failure behavior, and extra Ansible variables.
+- Added Ansible recap parsing so `failed`, `unreachable`, or `ignored` tasks
+  make a runner step fail even when Ansible itself exits successfully.
+- Added Python unit coverage for default runner configuration loading.
+
+### Sandboxed run layout
+
+- Moved HCS-generated data into a single per-run sandbox directory:
+  `AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>`.
+- Added canonical run subdirectories for runner data, logs, scratch space,
+  cache, artifacts, copied SUT tests, Phoronix data, and LTP data.
+- Added `hcs-runner.example.yml` as the shared runner configuration template.
+- Added automatic loading of local `hcs-runner.yml` so lab defaults such as
+  `run.base_dir` do not need to be passed on every command.
+- Added `hcs-runner.yml` to `.gitignore` because it is host/lab-specific local
+  configuration.
+- Preserved CLI overrides for automation and debugging, while documenting YAML
+  as the normal configuration path.
+
+### Reports and artifacts
+
+- Added a consistent runner artifact layout under `<sandbox>/runner/`.
+- Added `config.requested.json` with requested profile, inventory, repeat
+  count, variables, selected tests, and effective paths.
+- Added per-step console logs using stable names:
+  `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log`.
+- Added per-step JSON result files using stable names:
+  `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json`.
+- Added `run.summary.json` for machine-readable run summaries.
+- Added `run.report.txt` as the plain-text engineering report with timestamps,
+  runner version, status, pass index, durations, return codes, and result
+  reasons.
+- Captured repeated test passes independently while also producing a final
+  aggregate run summary.
+
+### GitHub Actions and badges
+
+- Added repository-level CI for YAML validation, shell syntax checks, and
+  Ansible syntax checks.
+- Added Python runner smoke CI for Python `3.11`, `3.12`, and `3.14`.
+- Added AlmaLinux container smoke CI for AlmaLinux `8`, `9`, and `10`.
+- Added a dedicated Ansible syntax-check workflow.
+- Added validation helper scripts under `.github/scripts/`.
+- Added README badges for CI, Python, Ansible, and AlmaLinux workflows.
+
+### Ansible and test execution changes
+
+- Updated `automated.yml` to create and use the sandbox directories before
+  running test roles.
+- Updated `vars.yml` with HCS sandbox variables for run ID, timestamp, base
+  directory, sandbox root, scratch directory, cache directory, artifacts
+  directory, logs directory, copied SUT test directory, Phoronix directory, and
+  LTP directory.
+- Updated CPU test execution so stress-ng logs and scratch data are written
+  under the active sandbox instead of ad-hoc locations.
+- Updated LTP configuration and logs to use the sandbox scratch area.
+- Updated Phoronix execution to use the sandbox work directory and scratch log
+  path.
+- Added AlmaLinux 10 Phoronix dependency adjustments for package name changes
+  and unavailable dependencies.
+- Updated network test messaging so users look for logs in the run log
+  artifacts rather than a hard-coded legacy path.
+
+### Documentation
+
+- Reworked the README structure around the normal runner workflow.
+- Added a real runner output excerpt from an AlmaLinux 10.2 VPS using Python
+  `3.14`, showing the generated run ID, sandbox path, pass results, recap
+  counters, durations, and final report summary.
+- Moved that runner output near the README introduction so users see the suite
+  result before setup details.
+- Documented the official AlmaLinux Hardware Certification Program context and
+  clarified that a local passing run is evidence for SIG review, not automatic
+  certification by itself.
+- Documented AlmaLinux 10 setup, Python `3.12` platform usage, optional CRB
+  enablement for newer Python such as `3.14`, virtualenv setup, Ansible
+  installation, tmux usage, and runner invocation.
+- Documented how to run one test and full profiles through the runner.
+- Documented how to run one test and full automated sets directly through
+  Ansible for low-level debugging.
+- Documented local and remote LTS/SUT terminology and runner configuration.
+- Clarified sandbox log collection for local and remote runs.
+- Documented Python `3.11+` as the intended minimum runner support level.
+
+### Planning
+
+- Added `xsub-development-plan.md` with the broader roadmap for turning the
+  suite into a repeatable, client-friendly, enterprise-grade hardware
+  certification runner.
+- The plan covers run profiles, global YAML configuration, sandboxing,
+  repeatable passes, artifact naming, plain-text reports, structured JSON,
+  future GUI integration, multi-pass analysis, outlier detection, graphs,
+  internal testing, and CI/quality badges.
+
+### Known follow-ups
+
+- Add `pyproject.toml` so the runner can be installed as a normal Python
+  package and exposed as an `hcs` console script.
+- Add coverage reporting and a coverage badge once the Python test suite grows.
+- Expand internal runner tests beyond configuration loading.
+- Define and version the report JSON schema.
+- Add richer multi-pass analysis for averages, spikes, outliers, and
+  bottleneck detection.
+- Keep GUI work as a later layer on top of the CLI runner model.
