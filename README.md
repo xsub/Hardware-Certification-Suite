@@ -47,7 +47,6 @@ pages.
 - Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
 - Coverage for the certification testing areas documented by the official
   program, including automated and interactive checks.
-- CI badges for repository checks, Python runner smoke tests, Ansible syntax checks, and AlmaLinux container smoke tests.
 
 ## Requirements
 
