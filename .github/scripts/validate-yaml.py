@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Validate that repository YAML files can be parsed."""
 
-from __future__ import annotations
-
 from pathlib import Path
 import sys
 
@@ -12,14 +10,14 @@ except ImportError as exc:
     raise SystemExit("PyYAML is required to validate YAML files") from exc
 
 
-def main() -> int:
+def main():
     paths = sorted(
         path
         for pattern in ("*.yml", "*.yaml")
         for path in Path(".").rglob(pattern)
         if ".git" not in path.parts
     )
-    errors: list[str] = []
+    errors = []
 
     for path in paths:
         try:
