@@ -22,8 +22,8 @@ python -m hcs run --profile check --inventory 127.0.0.1, -c local
 
 ## Runner Output
 
-Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 VPS
-with Python 3.14. The command is the normal user-facing invocation: the
+Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 test
+system with Python 3.14. The command is the normal user-facing invocation: the
 timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
 `/var/tmp` as the sandbox base directory. The identity header is built into
 HCS and does not require `fastfetch`, `neofetch`, or other system-wide helper

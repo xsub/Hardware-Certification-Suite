@@ -151,8 +151,8 @@ This entry summarizes the work currently present in the
 ### Documentation
 
 - Reworked the README structure around the normal runner workflow.
-- Added a real runner output excerpt from an AlmaLinux 10.2 VPS using Python
-  `3.14`, showing the generated run ID, sandbox path, pass results, recap
+- Added a real runner output excerpt from an AlmaLinux 10.2 test system using
+  Python `3.14`, showing the generated run ID, sandbox path, pass results, recap
   counters, durations, and final report summary.
 - Moved that runner output near the README introduction so users see the suite
   result before setup details.
