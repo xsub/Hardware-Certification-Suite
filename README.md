@@ -202,33 +202,77 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `run.summary.json` | Machine-readable summary for the run. |
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 
-Example `check` run captured on an AlmaLinux 10 VPS with Python 3.14:
+Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 VPS
+with Python 3.14. Repeated Rich live-refresh frames are omitted, but the
+commands, pass/fail results, recap counters, timings, and artifact paths come
+from the actual run.
 
 ```text
-╭───────────────────────────── AlmaLinux Hardware Certification Suite ─────────────────────────────╮
-│ Profile: check                                                                                   │
-│ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                            │
-│ Run ID: readme-check-vps                                                                         │
-│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps                          │
-│ Runner artifacts: /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps/runner          │
-│ Inventory: 127.0.0.1,                                                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+$ python -m hcs run --profile check --repeat 2 \
+    --run-id readme-real-check-20260601T005959Z \
+    --base-dir /var/tmp --inventory 127.0.0.1, -c local
+
+╭────────────────────────────── AlmaLinux Hardware Certification Suite ──────────────────────────────╮
+│ Profile: check                                                                                      │
+│ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                               │
+│ Run ID: readme-real-check-20260601T005959Z                                                          │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z           │
+│ Runner artifacts:                                                                                   │
+│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z/runner             │
+│ Inventory: 127.0.0.1,                                                                               │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
 ┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃   # ┃ Test               ┃ Tag          ┃ Profile ┃
 ┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━┩
 │ 001 │ Hardware detection │ hw_detection │ check   │
 └─────┴────────────────────┴──────────────┴─────────┘
-PASS 001 pass=01/01 Hardware detection
-Suite progress                                                                                  1/1
-Hardware detection 127.0.0.1                  : ok=8    changed=4    unreachable=0    failed=0… 0/…
-╭────────────────────────────────────────── Run complete ──────────────────────────────────────────╮
-│ Sandbox:                                                                                         │
-│ /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps                                   │
-│                                                                                                  │
-│ Runner artifacts:                                                                                │
-│ /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps/runner                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+Repeat: 2 passes, 2 total steps
+
+Suite progress 0/2
+Pass 1/2: running Hardware detection
+  TASK [Gathering Facts]
+  TASK [Create LTS logs dir]
+  TASK [Create SUT work dirs]
+  TASK [Copy tests]
+  TASK [Test Hardware Detection - run test]
+  TASK [Test Hardware Detection - copy log]
+  TASK [Remove tests]
+PASS 001 pass=01/02 Hardware detection
+  recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+  duration 36.7s
+  artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
+
+Suite progress 1/2
+Pass 2/2: running Hardware detection
+  TASK [Gathering Facts]
+  TASK [Create LTS logs dir]
+  TASK [Create SUT work dirs]
+  TASK [Copy tests]
+  TASK [Test Hardware Detection - run test]
+  TASK [Test Hardware Detection - copy log]
+  TASK [Remove tests]
+PASS 002 pass=02/02 Hardware detection
+  recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+  duration 33.8s
+  artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
+
+Suite progress 2/2
+╭──────────────────────────────────────────── Run complete ───────────────────────────────────────────╮
+│ Sandbox:                                                                                            │
+│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z                    │
+│                                                                                                     │
+│ Runner artifacts:                                                                                   │
+│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z/runner             │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+run.report.txt
+  Status: passed
+  Started: 2026-06-01T00:59:59Z
+  Finished: 2026-06-01T01:01:09Z
+  Results:
+    001 pass=01/02 hw_detection  passed  36.7s rc=0 ok
+    002 pass=02/02 hw_detection  passed  33.8s rc=0 ok
 ```
 
 ## Remote LTS/SUT
