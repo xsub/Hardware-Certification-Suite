@@ -162,7 +162,7 @@ pages.
 | Result submission | After the suite is run, share results through a pull request to [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications). |
 | Lifecycle | Certification is scoped to AlmaLinux major versions; minor versions are expected to carry forward unless the SIG requests another run. |
 
-## What You Get
+## Why Run It
 
 - A guided CLI runner with Rich progress output.
 - A built-in AlmaLinux identity header with logo and system facts, without
@@ -202,7 +202,7 @@ Terminology:
 For the simplest and most reliable run, use the same host as both LTS and SUT:
 `--inventory 127.0.0.1, -c local`.
 
-## Quick Start
+## Install And Run
 
 ```bash
 git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
@@ -226,10 +226,17 @@ Preview a longer plan without running Ansible:
 python -m hcs run --profile medium --repeat 3 --dry-run
 ```
 
-Detailed examples for single-test and full-suite runs are in
-[Running Tests](#running-tests).
+That is the happy path: clone the suite, create an isolated Python
+environment, install the runner dependencies, and start with a fast local
+`check` run. Use the technical section below when you need direct Ansible
+commands, single-test runs, GPU Burn options, remote SUT execution, or preset
+internals.
 
-## Running Tests
+## Technical Details: Running Tests
+
+This section is the operator reference. It intentionally goes deeper than the
+quick start and covers the individual knobs used for lab automation,
+debugging, and certification policy presets.
 
 Use the runner for normal certification work. It wraps Ansible, creates one
 sandbox per run, streams progress with Rich, writes per-step artifacts, parses
