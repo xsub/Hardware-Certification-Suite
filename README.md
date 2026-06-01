@@ -5,32 +5,73 @@
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 
-The AlmaLinux Hardware Certification Suite is the open source test toolkit used
-by the AlmaLinux Certification SIG to collect hardware compatibility,
-reliability, performance, and stability evidence for AlmaLinux OS.
+Turn a fresh AlmaLinux system into a repeatable hardware certification evidence
+run. HCS wraps the existing Ansible test suite with a Python/Rich runner that
+plans the work, streams progress, keeps every artifact in one sandbox, and
+produces plain-text plus JSON reports for review.
 
-This suite helps run and package the tests. Official certification status is
-granted through the AlmaLinux Hardware Certification Program after review by
-the Certification SIG; a local passing run does not, by itself, make hardware
-certified.
+HCS creates certification evidence. Official certification status is granted
+through the
+[AlmaLinux Hardware Certification Program](https://almalinux.org/certification/hardware-certification/)
+after review by the Certification SIG.
 
-The preferred entry point is the Python/Rich runner:
+## Start Here
+
+Install the runner once:
+
+```bash
+git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
+cd Hardware-Certification-Suite
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install "ansible-core>=2.17,<2.18" -r requirements-runner.txt
+cp hcs-runner.example.yml hcs-runner.yml
+```
+
+Run a fast local check:
 
 ```bash
 python -m hcs run --profile check --inventory 127.0.0.1, -c local
 ```
 
-## Runner Output
+Run the certification policy preset:
 
-Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 test
-system with Python 3.14. The command is the normal user-facing invocation: the
-timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
-`/var/tmp` as the sandbox base directory. The identity header is built into
-HCS and does not require `fastfetch`, `neofetch`, or other system-wide helper
-packages. Repeated Rich live-refresh frames are omitted, color is stripped for
-Markdown readability, and the host/IP values in this published excerpt are
-anonymized. The generated run ID, recap counters, timings, system facts, and
-artifact paths come from the actual run.
+```bash
+python -m hcs run --preset certification --inventory 127.0.0.1, -c local
+```
+
+No timestamp, run ID, or artifact path is required on the command line. The
+runner generates those values and stores the whole run under one sandbox such
+as:
+
+```text
+/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
+```
+
+Set the default sandbox base once in `hcs-runner.yml` when the lab needs a
+larger filesystem:
+
+```yaml
+run:
+  base_dir: /var/tmp
+```
+
+## What It Does
+
+| Area | Outcome |
+| --- | --- |
+| Guided execution | Rich console progress, visible test plan, pass counters, and clear pass/fail/unsupported results. |
+| Certification policy | A built-in `certification` preset separates required automated checks, optional checks, and manual checks. |
+| Repeatability | Built-in profiles from `check` through `extreme`, named presets, repeated passes, and per-test profile selection. |
+| Evidence quality | One sandbox per run, consistent filenames, plain-text reports, structured JSON, and per-step console logs. |
+| System identity | Built-in AlmaLinux logo and system facts without requiring `fastfetch`, `neofetch`, or system-wide helper packages. |
+| Accelerator readiness | Optional NVIDIA GPU Burn testing when drivers and GPUs are available, with opt-in snap workload handling. |
+
+## Console Preview
+
+Condensed excerpt from a real two-pass `check` run on an AlmaLinux 10.2 test
+system. Host and IP values are anonymized.
 
 ```text
 $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
@@ -59,31 +100,19 @@ $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
 almalinux@almalinux-sut.example
 -------------------------------
       OS: AlmaLinux 10.2 (Lavender Lion) x86_64
-    Host: OpenStack Foundation OpenStack Nova 19.3.2
   Kernel: Linux 6.12.0-211.7.4.el10_2.x86_64 x86_64
-  Uptime: 2 days, 19 hours, 34 mins
-Packages: 586 (rpm)
   Python: 3.14.4 (venv)
-   Shell: bash 5.2.26(1)-release
-     CPU: Intel Core Processor (Haswell, no TSX) (1 logical CPUs)
+     CPU: Intel Core Processor (Haswell, no TSX)
      GPU: Cirrus Logic GD 5446
   Memory: 607.7 MiB / 1.87 GiB (32%)
-    Swap: Disabled
-Disk (/): 3.92 GiB / 18.7 GiB (21%) - xfs
-Local IP: 192.0.2.10 (eth0)
-  Locale: en_US.UTF-8
  SELinux: Enforcing
-    FIPS: disabled
 
-╭────────────────────────────── AlmaLinux Hardware Certification Suite ──────────────────────────────╮
-│ Profile: check                                                                                      │
-│ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                               │
-│ Run ID: check-3248b3e5                                                                              │
-│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5                               │
-│ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner                                 │
-│ Inventory: 127.0.0.1,                                                                               │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────── AlmaLinux Hardware Certification Suite ────────────────────╮
+│ Profile: check                                                                 │
+│ Run ID: check-3248b3e5                                                         │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5          │
+│ Inventory: 127.0.0.1,                                                          │
+╰────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
 ┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
 ┃   # ┃ Test               ┃ Tag          ┃ Profile ┃ Scope   ┃
@@ -92,96 +121,32 @@ Local IP: 192.0.2.10 (eth0)
 └─────┴────────────────────┴──────────────┴─────────┴─────────┘
 Repeat: 2 passes, 2 total steps
 
-Suite progress 0/2
-Pass 1/2: running Hardware detection
-  TASK [Gathering Facts]
-  TASK [Create LTS logs dir]
-  TASK [Create SUT work dirs]
-  TASK [Copy tests]
-  TASK [Test Hardware Detection - run test]
-  TASK [Test Hardware Detection - copy log]
-  TASK [Remove tests]
 PASS 001 pass=01/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
   duration 68.2s
   artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
 
-Suite progress 1/2
-Pass 2/2: running Hardware detection
-  TASK [Gathering Facts]
-  TASK [Create LTS logs dir]
-  TASK [Create SUT work dirs]
-  TASK [Copy tests]
-  TASK [Test Hardware Detection - run test]
-  TASK [Test Hardware Detection - copy log]
-  TASK [Remove tests]
 PASS 002 pass=02/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
   duration 75.0s
   artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
 
-Suite progress 2/2
-╭──────────────────────────────────────────── Run complete ───────────────────────────────────────────╮
-│ Sandbox:                                                                                            │
-│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5                                        │
-│                                                                                                     │
-│ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner                                 │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 run.report.txt
   Status: passed
-  Started: 2026-06-01T11:58:20Z
-  Finished: 2026-06-01T12:00:43Z
-  Controller system:
-    OS: AlmaLinux 10.2 (Lavender Lion) x86_64
-    Host: OpenStack Foundation OpenStack Nova 19.3.2
-    Kernel: Linux 6.12.0-211.7.4.el10_2.x86_64 x86_64
-    Python: 3.14.4 (venv)
-    CPU: Intel Core Processor (Haswell, no TSX) (1 logical CPUs)
-    GPU: Cirrus Logic GD 5446
   Results:
     001 pass=01/02 hw_detection  profile  passed  68.2s rc=0 ok
     002 pass=02/02 hw_detection  profile  passed  75.0s rc=0 ok
 ```
 
-## Official Program
+## Certification Flow
 
-The public process is documented on the
-[AlmaLinux Hardware Certification](https://almalinux.org/certification/hardware-certification/)
-and
-[Hardware Certification Program](https://almalinux.org/certification/hardware-certification/hardware-certification-program/)
-pages.
-
-| Program item | What it means for this repository |
+| Step | Where it happens |
 | --- | --- |
-| Certification requests | Start through the official program flow or the [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications) repository. |
-| Certification coordination | Work with the [Certification SIG](https://wiki.almalinux.org/sigs/Certification.html), especially for IHV-assisted runs, private/NDA work, or hardware hosted by ALOSF. |
-| Certification types | Results may support IHV-facilitated, ALOSF-facilitated, or community validated certification paths. |
-| Public records | Accepted results and certification status are published through the [Ecosystem Catalog](https://almalinux.org/certification/ecosystem-catalog/), not by this repository alone. |
-| Result submission | After the suite is run, share results through a pull request to [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications). |
-| Lifecycle | Certification is scoped to AlmaLinux major versions; minor versions are expected to carry forward unless the SIG requests another run. |
-
-## Why Run It
-
-- A guided CLI runner with Rich progress output.
-- A built-in AlmaLinux identity header with logo and system facts, without
-  requiring `fastfetch`, `neofetch`, or any system-wide helper package.
-- Built-in run profiles from `check` through `extreme`.
-- A built-in `certification` preset that separates required automated tests,
-  optional automated tests, and manual certification checks.
-- Named runner presets created by a Rich prompt UI and saved in
-  `hcs-runner.yml`.
-- One sandbox directory per certification run.
-- Plain-text reports first, with structured JSON next to them.
-- Controller system identity recorded in both human and JSON artifacts.
-- Per-step console logs and result files with consistent names.
-- Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
-- Optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) stress
-  testing when NVIDIA drivers are already installed and `nvidia-smi` can see
-  the GPUs, with optional snap-based workload installation.
-- Coverage for the certification testing areas documented by the official
-  program, including automated and interactive checks.
+| Prepare the system | Install AlmaLinux, update it, enable the needed repositories, and install the runner prerequisites. |
+| Run HCS | Use `check` for a fast smoke test, then `--preset certification` for ordinary automated certification evidence. |
+| Review artifacts | Inspect `run.report.txt`, `run.summary.json`, per-step logs, and collected test artifacts in the sandbox. |
+| Submit results | Follow the official program flow and share accepted results through [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications). |
+| Publish status | Final status is published through the [Ecosystem Catalog](https://almalinux.org/certification/ecosystem-catalog/) after SIG review. |
 
 ## Requirements
 
@@ -194,49 +159,18 @@ pages.
 | Optional snapd | Used only when a preset allows installing the `gpu-burn` snap. |
 | Storage | At least `300GB`, preferably SSD/NVMe, for long Phoronix/LTP runs. |
 
-Terminology:
-
-- `LTS` - Local Testing Server, the host running the runner/Ansible controller.
-- `SUT` - System Under Test, the host being certified.
-
-For the simplest and most reliable run, use the same host as both LTS and SUT:
+`LTS` means the Local Testing Server, the host running the runner/Ansible
+controller. `SUT` means System Under Test, the host being certified. The
+simplest setup uses the same host as both LTS and SUT with
 `--inventory 127.0.0.1, -c local`.
 
-## Install And Run
+## Technical Details
 
-```bash
-git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
-cd Hardware-Certification-Suite
+The rest of this README is the operator reference. It covers single-test runs,
+direct Ansible usage, remote SUT execution, GPU Burn options, presets,
+profiles, sandbox layout, artifacts, and variables.
 
-python3.11 -m venv venv
-source venv/bin/activate
-pip install "ansible-core>=2.17,<2.18"
-pip install -r requirements-runner.txt
-cp hcs-runner.example.yml hcs-runner.yml
-
-python -m hcs profiles
-python -m hcs tests
-python -m hcs configure
-python -m hcs run --profile check --inventory 127.0.0.1, -c local
-```
-
-Preview a longer plan without running Ansible:
-
-```bash
-python -m hcs run --profile medium --repeat 3 --dry-run
-```
-
-That is the happy path: clone the suite, create an isolated Python
-environment, install the runner dependencies, and start with a fast local
-`check` run. Use the technical section below when you need direct Ansible
-commands, single-test runs, GPU Burn options, remote SUT execution, or preset
-internals.
-
-## Technical Details: Running Tests
-
-This section is the operator reference. It intentionally goes deeper than the
-quick start and covers the individual knobs used for lab automation,
-debugging, and certification policy presets.
+## Running Tests
 
 Use the runner for normal certification work. It wraps Ansible, creates one
 sandbox per run, streams progress with Rich, writes per-step artifacts, parses

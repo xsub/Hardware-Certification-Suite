@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-06-01 - README product-first structure
+
+- Reworked the README opening into a product-first flow with a short
+  certification value statement, minimal install commands, fast `check` run,
+  and one-command `certification` preset path before deeper operator details.
+- Condensed the runner console preview while keeping the AlmaLinux identity
+  header, planned steps, repeated pass output, artifact names, and final
+  report summary visible near the top.
+- Moved detailed runner, Ansible, preset, GPU Burn, sandbox, and variable
+  guidance under an explicit technical reference section.
+- Removed the repository-local `.vscode` settings file and ignored `.vscode/`
+  so editor state does not return to the fork.
+
 ## 2026-06-01 - certification policy preset
 
 - Added a built-in `certification` runner preset for ordinary automated
