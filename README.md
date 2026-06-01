@@ -5,78 +5,58 @@
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 
-This repo is the home of the AlmaLinux Certification Suite.  We largely rely on open source utilities, tests, and benchmarks to ensure various types workloads are stable on a given hardware configuration.
+The AlmaLinux Certification Suite validates that a hardware or virtualized
+platform can run AlmaLinux workloads reliably. It wraps existing open source
+hardware, stress, benchmark, and platform checks in a consistent runner that
+tracks progress, keeps every run sandboxed, and produces repeatable artifacts.
 
-# Terminology
-- LTS - Local Testing Server
-  - This is the server running the ansible-playbook
-- SUT - System Under Tests
-  - This is the system being tested
-
-# Common Requirements
-- SUT should be a blank, freshly installed and updated AlmaLinux system.
-- ansible >= 2.17 (older may work, but is untested)
-- Python >= 3.11 for the Rich CLI runner
-- git
-- screen, tmux, or local shell access
-- \>= 300GB disk space, preferably SSD/NVMe
-
-# Working directories
-Each certification run should own one sandbox directory. When the Rich runner is
-used, the default sandbox is generated as:
-
-```text
-/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
-```
-
-Everything created by HCS for that run is placed under the sandbox:
-
-- `runner/` - runner JSON, plain-text reports, and per-step console logs
-- `logs/` - normalized test logs collected in the run sandbox
-- `scratch/` - temporary tool output
-- `cache/` - reusable downloads and local caches
-- `artifacts/` - structured test artifacts
-- `sut-tests/` - copied test scripts on the SUT
-- `phoronix/` - Phoronix installation and result data
-- `ltp/` - Linux Test Project checkout and build data
-
-For remote LTS/SUT runs, Ansible still transfers command output from the SUT
-into the LTS/controller sandbox so results survive SUT cleanup. For local runs,
-the same path is used directly; no extra copy step is needed.
-
-When running Ansible directly, the same sandbox model is used through
-`vars.yml`. Override the sandbox explicitly with `sandbox_dir`:
+The preferred entry point is the Python/Rich runner:
 
 ```bash
-ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "sandbox_dir=/mnt/certification/run-001"
+python -m hcs run --profile check --inventory 127.0.0.1, -c local
 ```
 
-# Rich CLI runner
-The Python runner wraps the Ansible suite with a Rich console UI, predefined
-test-length profiles, repeatable passes, and consistent per-run artifacts.
-The runner supports Python 3.11 and newer. Python 3.11 is the lowest supported
-version; the current code and dependencies are validated in CI on Python 3.11,
-3.12, and 3.14.
+## What You Get
 
-Install it in the same virtual environment as Ansible:
+- A guided CLI runner with Rich progress output.
+- Built-in run profiles from `check` through `extreme`.
+- One sandbox directory per certification run.
+- Plain-text reports first, with structured JSON next to them.
+- Per-step console logs and result files with consistent names.
+- Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
+- CI badges for repository checks, Python runner smoke tests, Ansible syntax checks, and AlmaLinux container smoke tests.
+
+## Requirements
+
+| Requirement | Notes |
+| --- | --- |
+| AlmaLinux SUT | Prefer a blank, freshly installed and updated AlmaLinux system. |
+| Python | `3.11+` for the Rich runner. CI validates Python `3.11`, `3.12`, and `3.14`. |
+| Ansible | `ansible-core>=2.17,<2.18` is the tested range. |
+| Tools | `git`, `tmux` or `screen`, and shell access. |
+| Storage | At least `300GB`, preferably SSD/NVMe, for long Phoronix/LTP runs. |
+
+Terminology:
+
+- `LTS` - Local Testing Server, the host running the runner/Ansible controller.
+- `SUT` - System Under Test, the host being certified.
+
+For the simplest and most reliable run, use the same host as both LTS and SUT:
+`--inventory 127.0.0.1, -c local`.
+
+## Quick Start
 
 ```bash
+git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
+cd Hardware-Certification-Suite
+
 python3.11 -m venv venv
 source venv/bin/activate
-pip install ansible
+pip install "ansible-core>=2.17,<2.18"
 pip install -r requirements-runner.txt
-```
 
-Inspect the built-in profiles and test registry:
-
-```bash
 python -m hcs profiles
 python -m hcs tests
-```
-
-Run a local sanity pass:
-
-```bash
 python -m hcs run --profile check --inventory 127.0.0.1, -c local
 ```
 
@@ -86,36 +66,118 @@ Preview a longer plan without running Ansible:
 python -m hcs run --profile medium --repeat 3 --dry-run
 ```
 
-Available profiles are `check`, `short`, `medium`, `long`, `very_long`, and
-`extreme`. Use `--test <id>` to run one or more specific tests and
-`--extra-var KEY=VALUE` to pass Ansible variables such as
-`cpu_duration=20m`.
+Run one or more specific tests:
 
-Use `--base-dir`, `--sandbox-dir`, or `--run-id` to control the sandbox:
+```bash
+python -m hcs run --profile short --test hw_detection --test cpu
+```
+
+Override an Ansible variable:
+
+```bash
+python -m hcs run --profile medium --extra-var cpu_duration=20m
+```
+
+## AlmaLinux 10 Setup
+
+AlmaLinux 10 includes platform Python 3.12. CRB can be enabled when you want a
+newer interpreter such as Python 3.14.
+
+```bash
+dnf -y install git tmux python3.12
+
+# Optional: enable CRB and install Python 3.14.
+dnf -y install dnf-plugins-core
+dnf config-manager --set-enabled crb
+dnf -y install python3.14 python3.14-pip
+
+git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
+cd Hardware-Certification-Suite
+
+# Use python3.12 if you prefer the platform Python.
+PYTHON=python3.14
+
+$PYTHON -m venv venv-almalinux-certification-suite
+source venv-almalinux-certification-suite/bin/activate
+pip install "ansible-core>=2.17,<2.18"
+pip install -r requirements-runner.txt
+
+tmux new-session -s almalinux-certification-tests
+python -m hcs run --profile check --inventory 127.0.0.1, -c local
+```
+
+## Run Profiles
+
+| Profile | Purpose | Tests |
+| --- | --- | --- |
+| `check` | Fast sanity pass for runner, inventory, and hardware discovery. | `hw_detection` |
+| `short` | Short functional pass for early feedback. | `hw_detection`, `containers`, `kvm`, `cpu` |
+| `medium` | Practical default certification pass. | `hw_detection`, `containers`, `kvm`, `cpu`, `network`, `raid` |
+| `long` | Extended certification pass with LTP and Phoronix. | `hw_detection`, `containers`, `kvm`, `cpu`, `network`, `raid`, `ltp`, `phoronix` |
+| `very_long` | Long soak-oriented pass. | `hw_detection`, `containers`, `kvm`, `cpu`, `network`, `raid`, `ltp`, `phoronix` |
+| `extreme` | Maximum built-in coverage and duration. | `hw_detection`, `containers`, `kvm`, `cpu`, `network`, `raid`, `ltp`, `phoronix` |
+
+Useful runner commands:
+
+```bash
+python -m hcs profiles
+python -m hcs tests
+python -m hcs run --help
+```
+
+## Run Sandbox
+
+Each run owns one sandbox directory. By default:
+
+```text
+/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
+```
+
+Everything created by HCS for that run belongs under that root:
+
+| Path | Purpose |
+| --- | --- |
+| `runner/` | Runner JSON, plain-text reports, and per-step console logs. |
+| `logs/` | Normalized test logs collected in the run sandbox. |
+| `scratch/` | Temporary tool output. |
+| `cache/` | Reusable downloads and local caches. |
+| `artifacts/` | Structured test artifacts. |
+| `sut-tests/` | Copied test scripts on the SUT. |
+| `phoronix/` | Phoronix installation and result data. |
+| `ltp/` | Linux Test Project checkout and build data. |
+
+For remote LTS/SUT runs, Ansible transfers command output from the SUT into
+the LTS/controller sandbox so results survive SUT cleanup. For local runs, the
+same paths are used directly; no separate copy step is needed.
+
+Control the sandbox from the CLI:
 
 ```bash
 python -m hcs run --profile check --base-dir /var/tmp
-python -m hcs run --profile check --sandbox-dir /mnt/certification/AlmaLinux-HCS-lab-run-001
 python -m hcs run --profile check --run-id lab-run-001
+python -m hcs run --profile check --sandbox-dir /mnt/certification/AlmaLinux-HCS-lab-run-001
 ```
 
-The same values can be stored in YAML. See `hcs-runner.example.yml`:
+Or keep the paths in YAML:
 
 ```bash
 python -m hcs run --config hcs-runner.example.yml --profile check
 ```
 
-Each run writes runner files under `<sandbox>/runner/`:
+`hcs-runner.example.yml` keeps all configurable child paths inside the sandbox
+root by design.
 
-- `config.requested.json` - requested profile, inventory, repeat count, and variables
-- `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log` - streamed command output
-- `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` - structured step result
-- `run.summary.json` - machine-readable run summary
-- `run.report.txt` - plain-text engineering report with timestamps and runner version
+## Reports And Artifacts
 
-Ansible recap lines are parsed, so a task reported as `ignored=1`,
-`failed>0`, or `unreachable>0` is treated as a failed runner step even when
-Ansible exits with status `0`.
+Runner artifacts live under `<sandbox>/runner/`.
+
+| File | Purpose |
+| --- | --- |
+| `config.requested.json` | Requested profile, inventory, repeat count, variables, and effective paths. |
+| `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log` | Streamed command output for one step. |
+| `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` | Structured result for one step. |
+| `run.summary.json` | Machine-readable summary for the run. |
+| `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 
 Example `check` run captured on an AlmaLinux 10 VPS with Python 3.14:
 
@@ -146,241 +208,143 @@ Hardware detection 127.0.0.1                  : ok=8    changed=4    unreachable
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-# Suggested Run
-
-## Local Run
-The suggested way to run the certification suite is combining LTS/SUT - this means running this ansible playbook from the same host that is being tested.  This avoids any network-related issues between LTS and SUT causing a failure.  The expected runtime of the playbook is around 48 hours so the chance of a network blip causing a failure over publicly-networked hosts is great.
-
-We recommend using a local console or in something like `screen` or `tmux`.  We will use `tmux` in this example.
-
-  - Install git-core, tmux, and Python 3.12
-    ```bash
-    dnf install git-core tmux python3.12 -y
-    ```
-  - Clone this repository
-    ```bash
-    git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
-    ```
-  - Create python venv  with updated ansible (versus ansible version in EPEL)
-    ```bash
-    # create venv
-    python3.12 -m venv venv
-    # activate venv
-    source venv/bin/activate
-    # install ansible
-    pip install ansible
-    ```
-  - Run test suite in tmux session
-    ```bash
-    # move into ansible playbook dir
-    cd Hardware-Certification-Suite
-    # start tmux session
-    tmux new-session -s almalinux-certification-tests
-    # run playbook
-    ansible-playbook -c local -i 127.0.0.1, automated.yml --tags=phoronix
-    ```
-
 ## Remote LTS/SUT
-### Configure LTS
-#### Requirements
-- ansible >= 2.17
-- tmux
 
-#### Setup Commands
-##### AlmaLinux 10
+Use remote mode when the controller and SUT are different machines.
+
+1. Ensure the LTS can SSH to the SUT.
+2. Add the LTS public key to the SUT root account or configure another
+   privileged account.
+3. Verify connectivity:
+
 ```bash
-# install base tools and platform Python 3.12
-dnf -y install git tmux python3.12
-
-# optional: enable CRB and use a newer Python, for example Python 3.14
-dnf -y install dnf-plugins-core
-dnf config-manager --set-enabled crb
-dnf -y install python3.14 python3.14-pip
-
-# choose python3.12 here if you prefer the platform Python
-PYTHON=python3.14
-
-# create venv
-$PYTHON -m venv venv-almalinux-certification-suite
-# activate venv
-source venv-almalinux-certification-suite/bin/activate
-# install runner and ansible dependencies
-pip install "ansible-core>=2.17,<2.18"
-pip install -r requirements-runner.txt
-# start tmux session
-tmux new-session -s almalinux-certification-tests
-# run playbook
-ansible-playbook -i <SUT IP>, automated.yml --tags phoronix
+ansible all -i <SUT IP>, -m ping -u root
 ```
 
-##### Fedora >= 40
+Run a profile against the remote SUT:
+
 ```bash
-# install ansible and tmux
-dnf -y install ansible tmux
-# start tmux session
-tmux new-session -s almalinux-certification-tests
-# run playbook
-ansible-playbook -i <SUT IP>, automated.yml --tags phoronix
+python -m hcs run --profile check --inventory <SUT IP>,
 ```
 
-# Advanced information
-=======
-# Hardware Certification Suite
-This repo is the home of the AlmaLinux Certification Suite, built and maintained by the [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification). Contributions to this suite are welcome, and we invite contributors to become active in the SIG itself. 
+Long certification runs can last many hours. Use `tmux` or `screen` on the
+LTS so the session survives network interruptions.
 
-## Extensions - hardware- or software-specific tests
+## Direct Ansible Usage
 
-The certification suite is built modularly with intention, and we would love to expand this suite as our community needs to include the creation of hardware- or software-vendor specific test(s), and running them on request. 
+The Rich runner is preferred because it creates consistent run artifacts and
+interprets Ansible recap output. Direct Ansible execution is still useful for
+low-level debugging:
 
-### Example
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml
+ansible-playbook -i <SUT IP>, automated.yml --tags cpu
+ansible-playbook -i <SUT IP>, interactive.yml
+```
 
-For MariaDB database we could include a mariadb-test runner with parameters defined by MariaDB Foundation team for the suite to be able to detect functional regressions (potentially even including performance tests).
+Direct Ansible runs use the same sandbox defaults from `vars.yml`. Override
+the sandbox explicitly when needed:
 
-# Running the Certification suite
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml \
+  --extra-vars "sandbox_dir=/mnt/certification/run-001"
+```
 
-Below describes how to run the suite itself. Once the suite is run, results should be submitted to the (Certifications repo)[https://github.com/AlmaLinux/certifications]. 
+## Test Tags
 
-===
-Definitions: 
-* LTS - local testing server
-* SUT - system under tests
+Automated tests can be selected by Ansible tag.
 
-Configure LTS
-===
-Example SUT IP address: `192.168.244.7`
+| Tag | Purpose |
+| --- | --- |
+| `logs_folder` | Create the run logs directory. |
+| `tests_copy` | Copy test scripts from the LTS/controller to the SUT sandbox. |
+| `tests_cleanup` | Remove copied test scripts from the SUT sandbox. |
+| `hw_detection` | Hardware inventory and DMI/PCI/storage/network report. |
+| `containers` | Container functionality checks. |
+| `kvm` | KVM and virtualization checks. |
+| `cpu` | CPU stress test. |
+| `network` | Network stress test. |
+| `raid` | MD RAID test. |
+| `ltp` | Linux Test Project suites. |
+| `phoronix` | Phoronix benchmark suites. |
+| `cllimits` | CloudLinux LVE/CageFS checks. |
 
-1. Install Ansible  
-`yum --enablerepo=epel install ansible`
+Interactive tests are run through `interactive.yml` and are not split into the
+same per-test runner profiles yet.
 
-2. Add key  
-`ssh-keygen -t rsa`
+## Configuration Variables
 
-3. Add a key to SUT, a comma after the IP address is required  
-`ansible all -i 192.168.244.7, -m authorized_key -a "user=root key='{{ lookup('file', '/root/.ssh/id_rsa.pub') }}' path=/root/.ssh/authorized_keys manage_dir=no" --ask-pass`
+Most users should configure runs through the runner CLI or
+`hcs-runner.example.yml`. The Ansible variables below remain available for
+direct playbook use and advanced tuning.
 
-4. Check connection with SUT, comma after IP address is required  
-`ansible all -i 192.168.244.7, -m ping -u root`
+| Variable | Meaning |
+| --- | --- |
+| `hcs_run_id` | Run identifier used in generated sandbox names. |
+| `hcs_run_timestamp` | UTC timestamp used in generated sandbox names. |
+| `hcs_base_dir` | Base directory for generated sandboxes. Defaults to `/tmp`. |
+| `hcs_sandbox_dir` | Run sandbox root. Defaults to `/tmp/AlmaLinux-HCS-<timestamp>-RunID-<id>`. |
+| `hcs_work_dir` | Suite work directory. Defaults to `hcs_sandbox_dir`. |
+| `hcs_scratch_dir` | Scratch directory for temporary tool output. |
+| `hcs_cache_dir` | Cache directory for reusable downloads/assets. |
+| `hcs_artifacts_dir` | Directory for structured artifacts. |
+| `lts_logs_dir` | Log directory inside the active run sandbox. |
+| `sut_tests_dir` | Copied test script directory on the SUT. |
+| `test_cpu.duration` | CPU stress duration. Accepts stress-ng time suffixes. |
+| `test_cpu.scratch_dir` | Directory used by `stress-ng` for temporary files. |
+| `test_cpu.log_file` | Temporary CPU log path on the SUT. |
+| `test_network.duration` | Network test duration in seconds. |
+| `test_network.speed` | Target network test speed in Mbps. |
+| `test_network.device` | Optional network device selector. |
+| `test_raid.duration` | RAID test duration in seconds. |
+| `test_ltp.suites` | LTP suite pattern. |
+| `test_ltp.log_file` | LTP full log path on the SUT. |
+| `test_phoronix.tests` | Phoronix test suite mapping. |
+| `test_phoronix.folder` | Phoronix install/results directory under the sandbox. |
 
-How to add a new test
-===
+## Adding Tests
 
-Clone repository
-`cd ~ && git clone "https://github.com/AlmaLinux/Hardware-Certification-Suite.git"`
+Automated tests live under `tests/<test_id>/`:
 
-Create your test directory in the `~/Hardware-Certification-Suite/tests` folder, for example `example`.
+```text
+tests/example/
+  README.md
+  run_test.sh
+  roles/
+    main.yml
+```
 
-**Test directory structure for automated tests**
+Interactive tests use step playbooks:
 
-|- tests/example  
-|-- roles  
-|--- main.yml - Ansible tasks  
-|-- README.md - instructions for working with the test when manually launched  
-|-- run_test.sh - script to run the test
+```text
+tests/example/
+  README.md
+  step1.yml
+  step2.yml
+```
 
-**Test directory structure for interactive tests**
+Guidelines for new automated tests:
 
-|- tests/example  
-|-- step1.yml - sub playbook with interactive prompts  
-|-- step2.yml - sub playbook with interactive prompts  
-|-- stepx.yml - sub playbook with interactive prompts  
-|-- README.md - instructions for working with the test when manually launched
+- Add the Ansible task include to `automated.yml`.
+- Give the test a clear tag such as `example`.
+- Put test settings in `vars.yml` when they need to be configurable.
+- Write logs to `{{ lts_logs_dir }}/example.log`; that path is inside the
+  active run sandbox.
+- Keep temporary files under `hcs_scratch_dir`, `hcs_cache_dir`, or another
+  sandbox child path.
+- Avoid hard-coded `/root`, `/tmp`, or repository-relative output paths for
+  generated data.
 
-Each automated test should store test results and utility output in `{{ lts_logs_dir }}/name.log`. That path is inside the active run sandbox.
+## Notes
 
-Add your automated tasks that perform the test to the `~/Hardware-Certification-Suite/automated.yml` file and interactive playbook to the `~/Hardware-Certification-Suite/interactive.yml` file located in the root of the repository.
+- Roles execute in the context of the SUT. Use Ansible delegation only when a
+  task truly belongs on the LTS/controller.
+- Hardware-specific tests, such as RAID or USB, should be selected only when
+  the target platform has the expected devices.
+- Phoronix can require more than `100GB` of free space. Keep its folder inside
+  the run sandbox by setting `paths.phoronix_dir` or `sandbox_dir`.
+- Results should be submitted to the
+  [AlmaLinux certifications repository](https://github.com/AlmaLinux/certifications).
 
-Each test must be marked with a tag, for example `tags: test_example`
-
-Add your test settings to the `~/Hardware-Certification-Suite/vars.yml` file if required
-
-All tests are always run on LTS. How to run a test on LTS.
-===
-To run all automated tests:
-* Run tests on the LTS, comma after IP address is required  
-`ansible-playbook -i 192.168.244.7, automated.yml`
-
-* Run Phoronix tests on the LTS  
-`ansible-playbook -i 192.168.244.7, automated.yml --tags phoronix`
-
-To run all interactive tests: Run tests on the LTS, comma after IP address is required  
-`ansible-playbook -i 192.168.244.7, interactive.yml`
-
-How to run locally to test play
-===
-Run command:  
-`ansible-playbook -c local -i 127.0.0.1, automated.yml`
-
-Variables
-===
-Tests can be configured via `~/Hardware-Certification-Suite/vars.yml` file.
-
-* lts_ip - LTS IP address
-* lts_tests_dir - LTS test folder
-* lts_logs_dir - LTS logs folder
-* sut_ip - SUT IP address
-* sut_tests_dir - SUT logs folder
-* hcs_run_id - Run identifier used in the generated sandbox name
-* hcs_run_timestamp - UTC timestamp used in the generated sandbox name
-* hcs_base_dir - Base directory for generated sandboxes. Defaults to `/tmp`
-* hcs_sandbox_dir - Run sandbox root. Defaults to `/tmp/AlmaLinux-HCS-<timestamp>-RunID-<id>`
-* hcs_work_dir - Suite work directory. Defaults to `hcs_sandbox_dir`
-* hcs_scratch_dir - Scratch directory for temporary tool output
-* hcs_cache_dir - Cache directory for future reusable downloads/assets
-* hcs_artifacts_dir - Directory reserved for structured artifacts
-* test_cpu['duration'] - stop stress test after T seconds. You can specify time units in seconds, minutes, hours, days, or years with the s, m, h, d, or y suffix. If the timeout is 0, the test will run forever.
-* test_cpu['scratch_dir'] - `stress-ng` temporary path
-* test_cpu['log_file'] - temporary CPU log path on the SUT
-* test_network['duration'] - Test duration in seconds
-* test_network['speed'] - Target network test speed in Mbps
-* test_network['device'] - Testing a specific network device
-* test_raid['duration'] - Test duration in seconds
-* test_ltp['suites'] - Specify PATTERN to only run test cases which match PATTERN. By default all tests.
-* test_ltp['log_file'] - LTP full log path on the SUT
-* test_phoronix['suites'] - Define test cases
-* test_phoronix['folder'] - Specify a folder for installing tests and storing results
-
-Test tags
-===
-You can run automated tests by tag.
-For example:  
-`ansible-playbook -i 192.168.244.7, automated.yml --tags cpu`
-
-Available tags:
-
-* logs_folder - create logs folder
-* tests_copy - copy `~/Hardware-Certification-Suite/tests` folder from LTS to SUT
-* tests_cleanup - remove tests folder from SUT
-* containers - test
-* cpu - test
-* hw_detection - test
-* pxe - test
-* kvm - test
-* network - test
-* raid - test
-* phoronix - test suits (can only be run by tag)
-* ltp - tests (can only be run by tag)
-* cllimits - test suits for lve/cagefs checkers (CL only)
-
-Interactive tests can't be run separately.
-
-Results
-===
-The ansible output will display information about each test. If there are errors, the tests will be colored red.
-
-Summary information will display the test result. Notice the ignored=0 value. If it is > 0, the test has failed.  
-The value of failed is always 0, due to skipping failed tests for further sequential execution.  
-Example: `127.0.0.1 : ok=9 changed=7 unreachable=0 failed=0 skipped=0 rescued=0 ignored=1`
-
-TIPS
-===
- 
-* Roles work in the context of the SUT, to run a command on the LTS, you need to run commands using `local_action`.    
-`Run command on the LTS: local_action`  
-`Run command on the SUT: command, sh, etc.` 
-* Before starting testing, you need to request information about the hardware. For example, it is not necessary to run a RAID test everywhere.
-* Notify in advance of the need to prepare the number of devices equal to the number of USB ports on the server to run the USB test.
-* Testing can be delayed, it is recommended to use the screen utility. For example `screen -L -S hctest`
-* For phoronix test, you need more than 100 gigabytes of space. By default it stores test data under the run sandbox. To change the location while keeping data sandboxed, use the runner config `paths.phoronix_dir` or override `sandbox_dir`.
-
----
-This repo is managed by the [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification)
+This repository is managed by the
+[AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification).
