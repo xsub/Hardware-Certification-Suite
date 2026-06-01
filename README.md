@@ -1,7 +1,7 @@
 # AlmaLinux Certification Suite
 
 [![CI](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml)
-[![Python](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
+[![Python 3.11+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 
