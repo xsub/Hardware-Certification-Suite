@@ -9,10 +9,63 @@ well-thought certification process, collect quality benchmark data, preserve raw
 evidence, and produce consistent reports that AlmaLinux can use for review,
 comparison, and long-term certification records.
 
+Last updated: 2026-06-01.
+
+## Current Fork Baseline
+
+The `xsub/Hardware-Certification-Suite` fork now contains the first practical
+runner foundation. This changes the roadmap from "build the runner first" to
+"harden, validate, and productize the runner."
+
+Implemented in the fork:
+
+- Python/Rich runner package under `hcs/`.
+- Runner commands for listing profiles, listing tests, configuring presets,
+  and running Ansible-backed plans.
+- Profiles from `check` through `extreme`.
+- Built-in `certification` preset with required automated tests, optional
+  automated tests, and manual USB/PXE checks tracked separately.
+- Named presets saved in `hcs-runner.yml` with per-test profile selection,
+  duration caps, repeat count, inventory, connection mode, and GPU Burn snap
+  behavior.
+- One generated sandbox per run:
+  `AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>`.
+- Runner artifacts under the sandbox, including requested config JSON,
+  per-step console logs, per-step result JSON, `run.summary.json`, and
+  `run.report.txt`.
+- Repeated passes with all pass artifacts preserved.
+- Ansible recap parsing so `failed`, `unreachable`, or `ignored` counters are
+  treated as runner failures even when Ansible exits successfully.
+- Built-in AlmaLinux identity header and controller system facts in console and
+  report artifacts.
+- Sandboxed defaults for CPU scratch data, Phoronix, LTP, copied SUT tests,
+  logs, cache, artifacts, and GPU Burn telemetry.
+- Optional NVIDIA `gpu_burn` test with `nvidia-smi` detection, unsupported
+  reporting when drivers are absent, AlmaLinux native NVIDIA setup guidance,
+  and opt-in snap workload install/remove behavior.
+- AlmaLinux 10 Phoronix compatibility patch for stale Fedora dependency names.
+- GitHub Actions for CI, Python runner checks, Ansible syntax checks, and
+  AlmaLinux container smoke checks.
+- Product-first README plus detailed `docs/runner.md` operator reference.
+
+Still roadmap, not yet complete:
+
+- Formal schema validation for config, summaries, events, reports, and test
+  result artifacts.
+- `python -m hcs env doctor` / `python -m hcs preflight` command.
+- Resume/checkpoint/event replay model.
+- Rich dashboard refinements such as ETA, log tail controls, warnings, and
+  bottleneck hints.
+- Metrics time-series model and aggregation across repeated passes.
+- Cache warm/verify/offline mode.
+- GUI run browser and analysis frontend.
+- Extension/plugin framework for ISV or workload packs.
+- Live USB or appliance-style deployment.
+
 ## Guiding Principles
 
 - Keep Ansible as the low-level executor for remote/local system actions.
-- Add a Python runner as the suite control plane.
+- Treat the Python/Rich runner as the suite control plane.
 - Build CLI/TUI first. Treat a GUI as a later frontend over the same core.
 - Make every run reproducible, resumable, auditable, and reportable.
 - Preserve raw evidence. Reports must summarize, not replace, raw artifacts.
@@ -29,20 +82,24 @@ comparison, and long-term certification records.
 The existing GitHub issues are still useful, but they should be interpreted in a
 broader suite-quality context.
 
-- `#21` Stop using `/root` for Phoronix download/test location: still valid.
-  Current defaults still place Phoronix, LTP, copied tests, and logs under
-  `/root` or root-adjacent locations.
-- `#10` Make CPU test use `--temp-path`: still valid. `stress-ng` should use a
-  controlled scratch directory.
-- `#7` Deprecated Ansible `include`: mostly fixed on current upstream `main`,
-  but still relevant to older branch work such as the MariaDB/ISV branch.
-- `#22` Reduce runtime: valid, but should become a profile system rather than
-  random test removal.
-- `#20` Cache downloadable test files: valid. This becomes important for client
-  installs, repeated test passes, and offline or unreliable-network
-  environments.
-- `#19` Live USB image: valuable, but it should come after clean work
-  directories, profiles, runner, cache, and reporting exist.
+- `#21` Stop using `/root` for Phoronix download/test location: mostly
+  addressed in the fork through sandboxed `hcs_work_dir`, `hcs_scratch_dir`,
+  `hcs_cache_dir`, `hcs_artifacts_dir`, `sut_tests_dir`, `lts_logs_dir`,
+  Phoronix, and LTP defaults. Keep this open until remote SUT runs and every
+  tool-native output path is audited end to end.
+- `#10` Make CPU test use `--temp-path`: addressed in the fork. CPU now passes
+  a sandboxed scratch directory into `stress-ng --temp-path`. Follow-up work
+  should add artifact contract tests and cleanup verification.
+- `#7` Deprecated Ansible `include`: upstream mostly fixed it; keep watching
+  older branch work and any future ISV/test-pack imports.
+- `#22` Reduce runtime: addressed structurally by runner profiles and named
+  presets. Follow-up work should tune profile durations from real validation
+  data rather than guessing.
+- `#20` Cache downloadable test files: still valid. The sandbox has a cache
+  directory, but cache warm/verify/offline behavior and checksums are not
+  finished.
+- `#19` Live USB image: still valuable, but it should come after preflight,
+  cache/offline support, resume/checkpointing, and stable report schemas.
 - `#6`, `#11`, `#12` MariaDB and ISV involvement: valid, but should become an
   extension framework, with MariaDB as the first concrete plugin/test pack.
 
@@ -77,12 +134,15 @@ The suite should be easy to run at a client installation.
 An operator should be able to do something like:
 
 ```bash
-hcs run --profile check --target 192.168.1.50
-hcs run --profile medium --inventory hosts.yml --config site.yml
-hcs resume ./runs/latest
-hcs report ./runs/latest
-hcs validate ./runs/latest
+python -m hcs run --profile check --inventory 127.0.0.1, -c local
+python -m hcs run --preset certification --inventory 127.0.0.1, -c local
+python -m hcs configure --preset lab-default
+python -m hcs run --preset lab-default
+python -m hcs run --preset certification --inventory <SUT IP>,
 ```
+
+The current runner is invoked as `python -m hcs`. A future packaged entry point
+can provide a shorter `hcs` command once packaging lands.
 
 The runner should clearly show:
 
@@ -100,8 +160,8 @@ normal certification run.
 
 Initial interactive runner behavior:
 
-- provide `hcs configure` as a Rich prompt UI for building a named preset in
-  `hcs-runner.yml`
+- provide `python -m hcs configure` as a Rich prompt UI for building a named
+  preset in `hcs-runner.yml`
 - show checkbox-style prompts for each known test and record whether that test
   is enabled in the preset
 - let each enabled test choose its own profile from `check` through `extreme`
@@ -112,9 +172,9 @@ Initial interactive runner behavior:
   tests, and manual checks
 - show required/optional scope in the runner plan and write it into report
   artifacts
-- store the default preset name under `run.default_preset`, so `hcs run` can
-  use the saved lab configuration without requiring the operator to repeat
-  flags
+- store the default preset name under `run.default_preset`, so
+  `python -m hcs run` can use the saved lab configuration without requiring
+  the operator to repeat flags
 - keep explicit CLI commands authoritative: `--profile` runs the normal
   profile test list unless `--preset` is also supplied
 
@@ -167,11 +227,13 @@ Recommended near-term behavior:
   Python `3.12+`
 - record Python version, venv/system mode, executable path, and dependency
   metadata in the run artifacts
-- add an explicit `hcs env doctor` command that validates the current venv,
-  Ansible version, required Python packages, and expected runner entry points
-- add an explicit `hcs env rebuild` command or wrapper script later that
+- add an explicit `python -m hcs env doctor` command that validates the current
+  venv, Ansible version, required Python packages, and expected runner entry
+  points
+- add an explicit `python -m hcs env rebuild` command or wrapper script later that
   recreates a named venv before starting the runner
-- never silently rebuild or delete the active venv as part of `hcs run`
+- never silently rebuild or delete the active venv as part of
+  `python -m hcs run`
 
 For highly reproducible lab runs, a future wrapper can create a clean per-run
 tool environment before invoking the runner:
@@ -335,63 +397,69 @@ The requested config is what the user provides. The effective config is what the
 runner resolves after applying defaults, profile settings, detected hardware,
 and command-line overrides.
 
-Important config areas:
+Current near-term config shape:
 
 ```yaml
-certification:
-  profile: medium
-  work_dir: /var/tmp/almalinux-certification
-  logs_dir: "{{ work_dir }}/logs"
-  scratch_dir: "{{ work_dir }}/scratch"
-  artifacts_dir: "{{ work_dir }}/artifacts"
-  cache_dir: "{{ work_dir }}/cache"
+run:
+  base_dir: /var/tmp
+  default_preset: certification
+  id:
+  sandbox_dir:
 
-target:
-  inventory: null
-  host: 127.0.0.1
-  connection: local
+paths:
+  runner_dir: runner
+  logs_dir: logs
+  scratch_dir: scratch
+  cache_dir: cache
+  artifacts_dir: artifacts
+  sut_tests_dir: sut-tests
+  phoronix_dir: phoronix
+  ltp_dir: ltp
 
-runner:
-  resume: true
-  stop_on_failure: false
-  collect_raw_logs: true
-  collect_metrics: true
+ansible:
+  extra_vars: {}
 
-reporting:
-  formats:
-    - txt
-    - md
-  include_raw_artifact_index: true
+presets:
+  lab-default:
+    profile: medium
+    inventory: 127.0.0.1,
+    connection: local
+    repeat: 3
+    tests:
+      hw_detection:
+        enabled: true
+        profile: check
+      cpu:
+        enabled: true
+        profile: long
+        duration: 30m
 ```
+
+Future config work should add schema validation, explicit effective-config
+artifacts, documented compatibility guarantees, and migration helpers when the
+config format changes.
 
 ## Work Directory Layout
 
 The suite should not default to `/root` for working data.
 
-Recommended default:
+Current default sandbox:
 
 ```text
-/var/tmp/almalinux-certification/
-  cache/
+/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>/
+  runner/
+  logs/
   scratch/
-  runs/
-  tmp/
+  cache/
+  artifacts/
+  sut-tests/
+  phoronix/
+  ltp/
 ```
 
-Each run should get its own directory:
-
-```text
-runs/20260601T101530Z-medium-host01/
-  run.manifest.json
-  run.summary.json
-  run.events.jsonl
-  run.report.txt
-  run.report.md
-  config.requested.yml
-  config.effective.yml
-  preflight.system.json
-  tests/
-```
+Labs can set `run.base_dir: /var/tmp` or another filesystem in
+`hcs-runner.yml`. Future work should add `run.events.jsonl`,
+`config.effective.json`, manifest checksums, and stronger retention controls.
 
 ## Artifact Contract
 
@@ -402,29 +470,26 @@ names.
 Filename pattern:
 
 ```text
-<step-number>-<test-id>[.attempt-NNN].<artifact-type>.<extension>
+<step-number>-pass<pass-number>-<test-id>.<artifact-type>.<extension>
 ```
 
 Examples:
 
 ```text
-001-preflight.result.json
-001-preflight.console.log
-002-hw-detection.hardware.json
-003-cpu.attempt-001.result.json
-003-cpu.attempt-001.console.log
-003-cpu.attempt-001.stress-ng.log
-004-network.attempt-002.iperf3.json
-004-network.metrics.json
-006-phoronix.native-result.json
-006-phoronix.report.pdf
-007-ltp.full.log
+001-pass01-hw_detection.console.log
+001-pass01-hw_detection.result.json
+002-pass01-cpu.console.log
+002-pass01-cpu.result.json
+003-pass02-network.console.log
+003-pass02-network.result.json
+gpu-burn/gpu-burn.nvidia-smi.csv
+gpu-burn/gpu-burn.result.json
 ```
 
 Every test should produce at least:
 
-- `NNN-test-id.result.json`
-- `NNN-test-id.console.log`
+- `NNN-passNN-test_id.result.json`
+- `NNN-passNN-test_id.console.log`
 
 Optional artifacts:
 
@@ -435,6 +500,11 @@ Optional artifacts:
 - native JSON
 - native PDF
 - screenshots or images if a future test needs them
+
+Future schema work can decide whether to preserve `passNN` terminology or
+introduce an explicit `attemptNN` directory layer. The important rule is that
+operators and automation must be able to identify step number, pass number,
+test ID, artifact type, and file format without parsing tool-native output.
 
 ## Test Result Schema
 
@@ -961,9 +1031,9 @@ Add:
 Example:
 
 ```bash
-hcs cache warm --profile medium
-hcs cache verify
-hcs run --profile medium --offline
+python -m hcs cache warm --profile medium
+python -m hcs cache verify
+python -m hcs run --profile medium --offline
 ```
 
 ## Preflight
@@ -1055,167 +1125,167 @@ Dependencies:
 
 The Live USB should boot into a guided console runner first. GUI can come later.
 
-## Recommended PR Order
+## Implemented Foundation In This Fork
 
-### PR 1: Configurable Work Directories And CPU Temp Path
+These roadmap items have already landed in the `xsub` fork and should now be
+treated as the base for follow-up PRs:
 
-Purpose: make runtime state safe and predictable.
+- configurable sandbox directories and CPU `stress-ng --temp-path`
+- profile registry from `check` through `extreme`
+- Python/Rich runner core
+- test listing and profile listing
+- Rich console progress and planned step table
+- repeated passes with per-pass artifacts
+- stable per-step console/result file names
+- plain-text `run.report.txt` and machine-readable `run.summary.json`
+- `python -m hcs configure` preset prompt UI
+- built-in `certification` policy preset
+- per-test profile and duration override support
+- optional `gpu_burn` test with NVIDIA detection and snap workload support
+- AlmaLinux 10 Phoronix dependency compatibility patch
+- GitHub Actions and README badges
+- product-first README plus detailed `docs/runner.md`
 
-Includes:
+## Recommended Next PR Order
 
-- `work_dir`, `logs_dir`, `scratch_dir`, `artifacts_dir`, `cache_dir`
-- no `/root` defaults for Phoronix, LTP, copied tests, or scratch data
-- `stress-ng --temp-path`
-- no `0777` copy permissions
-- README update
+### PR 1: Preflight And Environment Doctor
 
-Closes or addresses:
-
-- `#21`
-- `#10`
-
-Suggested branch:
-
-```text
-fix/configurable-workdir
-```
-
-### PR 2: Profile YAML And Test Registry
-
-Purpose: define `check`, `short`, `medium`, `long`, `very_long`, and `extreme`.
-
-Includes:
-
-- profile schema
-- test registry
-- effective config generation
-- documentation
-
-### PR 3: Artifact Naming And Result Schema
-
-Purpose: enforce enterprise-quality output consistency.
+Purpose: make the runner tell operators what is missing before a long run
+starts.
 
 Includes:
 
-- artifact contract
-- result JSON schema
-- manifest schema
-- initial validators
+- `python -m hcs env doctor`
+- `python -m hcs preflight`
+- Python, Ansible, privilege, disk space, SELinux/FIPS, repository, EPEL/CRB,
+  package availability, and writable-sandbox checks
+- Phoronix/LTP/GPU Burn-specific readiness checks
+- actionable remediation text
+- preflight JSON artifact in the sandbox
 
-### PR 4: Python Runner Core
+### PR 2: Schema Validation And Artifact Contract Tests
 
-Purpose: introduce the headless control plane.
-
-Includes:
-
-- config loader
-- test planner
-- executor wrapper
-- event emitter
-- artifact manager
-- resume model skeleton
-
-### PR 5: Rich-Based Console Runner
-
-Purpose: make client runs easy to observe.
+Purpose: make reports and artifacts stable enough for automation, PR review,
+and future GUI import.
 
 Includes:
 
-- live progress
-- current test/attempt
-- test list
-- elapsed time
-- log tail
-- artifact pointers
+- JSON schemas for requested config, summary, per-step result, system identity,
+  and future events
+- pytest coverage for generated artifact paths and file names
+- sample fixtures for passed, failed, unsupported, and dry-run steps
+- documentation of compatibility guarantees
 
-### PR 6: Repetition And Aggregation
+### PR 3: Effective Config And Manifest
 
-Purpose: support multiple attempts and benchmark-quality summaries.
-
-Includes:
-
-- per-test repetitions
-- per-attempt artifact directories
-- aggregate metrics
-- variance warnings
-
-### PR 7: Plain-Text And Markdown Reports
-
-Purpose: produce engineering-friendly reports.
+Purpose: make every run fully reproducible from artifacts.
 
 Includes:
 
-- `run.report.txt`
-- `run.report.md`
-- report footers
-- timestamps
-- versions
-- manifest checksum
+- `config.effective.json`
+- `run.manifest.json`
+- runner version, git commit, Python version, Ansible version, OS facts, command
+  line, selected preset/profile, resolved tests, extra vars, and path map
+- manifest checksums for key report files
 
-### PR 8: Internal Tests And Badges
+### PR 4: Cache And Offline Support
 
-Purpose: validate the suite itself.
-
-Includes:
-
-- CI workflow
-- lint checks
-- schema tests
-- artifact contract tests
-- initial coverage badge for Python code
-
-### PR 9: Cache And Offline Support
-
-Purpose: make repeated and client-site runs reliable.
+Purpose: make client-site and repeated lab runs reliable when the network is
+slow, restricted, or absent.
 
 Includes:
 
-- cache warm/verify
-- checksums
+- cache warm/verify commands
+- checksums for downloaded assets
 - offline mode
-- Phoronix/LTP/container asset strategy
+- Phoronix, LTP, container, GPU Burn, and package cache strategy
+- clear reporting when a test cannot run because required cached assets are
+  missing
 
-### PR 10: ISV Extension Framework
+### PR 5: Event Stream, Resume, And Checkpointing
 
-Purpose: support MariaDB and future ISV tests cleanly.
+Purpose: make long runs safer and prepare the GUI.
+
+Includes:
+
+- `run.events.jsonl`
+- typed runner events
+- periodic checkpoints
+- resumable runs where feasible
+- graceful stop with partial report
+- replay support for console and GUI views
+
+### PR 6: Burn-In Telemetry Profiles
+
+Purpose: turn HCS into a credible long-running stability and acceptance tool.
+
+Includes:
+
+- `burn_in_short`, `burn_in_medium`, `burn_in_long`, `continuous`,
+  `post_change`, and `rma_triage` presets or profile family
+- periodic sampling for thermals, clocks, memory pressure, disk health,
+  network counters, kernel logs, and GPU telemetry where available
+- report sections for spikes, warnings, throttling, resets, and variance
+- partial report snapshots for multi-day runs
+
+### PR 7: GPU Track Phase 2
+
+Purpose: make AlmaLinux more attractive for AI, CUDA, and VFX-ready systems.
+
+Includes:
+
+- `gpu_detection` facts independent of GPU Burn
+- `nvidia_driver` validation for AlmaLinux native NVIDIA packages
+- optional CUDA smoke test when toolchain is present
+- richer GPU telemetry and Xid/ECC/error analysis
+- future room for ROCm, oneAPI, Vulkan, Blender, and Phoronix GPU suites
+
+### PR 8: GUI-Ready Run Store
+
+Purpose: give the future PyQt5 GUI a clean backend instead of scraping text.
+
+Includes:
+
+- run index/database under a configured lab directory
+- import of historical sandbox runs
+- query APIs for runs, steps, artifacts, metrics, warnings, and comparisons
+- report export hooks
+
+### PR 9: PyQt5 Analysis GUI
+
+Purpose: provide the enhanced visual runner and analysis tool after the CLI
+contracts are stable.
+
+Includes:
+
+- live run dashboard
+- test selection and preset editor
+- artifact browser
+- charts for repeated passes
+- outlier/spike analysis
+- bottleneck exploration
+- report export
+
+### PR 10: Extension Framework And Live Media
+
+Purpose: grow beyond the core AlmaLinux certification runner.
 
 Includes:
 
 - plugin/test-pack registry
-- MariaDB migration
-- ISV documentation
-
-### PR 11: Live USB
-
-Purpose: simplify client-site certification setup.
-
-Includes:
-
-- bootable certification environment
-- preloaded cache
-- guided console runner
-
-### PR 12: GUI
-
-Purpose: analysis and visualization frontend.
-
-Includes:
-
-- run browser
-- live dashboard
-- graphs
-- multi-pass comparison
-- spike/outlier analysis
-- bottleneck exploration
-- report export
+- MariaDB or another ISV pack as the first concrete extension
+- generic Linux compatibility labels for tests
+- Live USB or appliance-style deployment once cache/offline and preflight are
+  mature
 
 ## Near-Term Recommendation
 
-Start with a small, mergeable fix branch for work directories and CPU temp path.
+The next best mergeable step is preflight/environment doctor plus schema
+validation. Those two pieces make the current runner safer for client
+installations, make failures easier to understand, and create the stable data
+contracts needed for cache/offline, resume, burn-in telemetry, and the future
+PyQt5 GUI.
 
-That creates immediate value, closes still-valid issues, and prepares the
-ground for profiles, artifacts, runner, reports, and eventually the GUI.
-
-After that, implement profiles and the artifact contract before building the
-runner UI. The UI will be much better if the suite already knows what a test is,
-where its artifacts go, and how to report status consistently.
+Keep GUI work behind the data contracts. The GUI should consume the same run
+events, summaries, metrics, and artifacts as the CLI instead of becoming a
+parallel implementation.

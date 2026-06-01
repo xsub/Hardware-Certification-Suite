@@ -7,6 +7,10 @@
   and one-command `certification` preset path before deeper operator details.
 - Renamed the roadmap file to `DevelopmentPlan.md` and updated the README
   roadmap link.
+- Updated `DevelopmentPlan.md` so the roadmap starts from the current fork
+  baseline, marks landed runner/sandbox/preset/GPU Burn work, refreshes issue
+  triage, and defines the next PR sequence around preflight, schemas, cache,
+  events, burn-in telemetry, GPU phase 2, and GUI readiness.
 - Renamed the README value table headers to `HCS Features` and
   `Provides / Value`.
 - Removed the AlmaLinux identity row from the README feature table to keep the
