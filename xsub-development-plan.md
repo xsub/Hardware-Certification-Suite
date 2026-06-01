@@ -106,10 +106,15 @@ without making the core runner impossible to reuse elsewhere.
 Initial behavior:
 
 - detect the local distribution from `/etc/os-release`
-- if `fastfetch` is available, use it to render a distro logo for the detected
-  Linux distribution
-- if the detected system is AlmaLinux and `fastfetch` is not available, render
-  a built-in AlmaLinux ASCII logo
+- render a built-in AlmaLinux ASCII logo when the controller is running on
+  AlmaLinux, without requiring `fastfetch` or any other system package
+- print a compact system identity table next to the logo with OS, host,
+  kernel, uptime, RPM package count, Python mode, shell, CPU, GPU, memory,
+  swap, root filesystem, local IP, locale, SELinux, and FIPS state when those
+  facts are available
+- if `fastfetch` is available in the operator environment, optionally use it
+  only as a presentation enhancement; it must never be required for a normal
+  HCS run
 - record distribution identity in the requested/effective config and run
   manifest
 - keep UI branding AlmaLinux-first while keeping executor, profiles, artifacts,
@@ -117,9 +122,9 @@ Initial behavior:
 
 Future behavior:
 
-- include distro facts in every report: ID, version, kernel, architecture,
-  virtualization, container status, SELinux mode, FIPS mode, CPU, memory, GPU,
-  storage, network, firmware, and secure boot state
+- expand report facts with virtualization, container status, firmware, secure
+  boot state, disk controller details, NIC inventory, accelerator topology, and
+  loaded kernel modules
 - allow downstream projects to provide their own branding/logo/plugin layer
   without forking the runner core
 - split tests into generic Linux tests, AlmaLinux-specific tests, and
@@ -128,6 +133,46 @@ Future behavior:
 - provide a clean compatibility matrix showing which tests are generic and
   which require AlmaLinux, EPEL, vendor repositories, or hardware-specific
   drivers
+
+## Python Environment Reproducibility
+
+The first implementation should keep the Python virtual environment as the
+operator-controlled bootstrap environment. It must be simple to create, inspect,
+and reuse, because the runner itself is the control plane and should not delete
+the interpreter it is currently running inside.
+
+Recommended near-term behavior:
+
+- document a single supported bootstrap venv flow for AlmaLinux 10 using
+  Python `3.12+`
+- record Python version, venv/system mode, executable path, and dependency
+  metadata in the run artifacts
+- add an explicit `hcs env doctor` command that validates the current venv,
+  Ansible version, required Python packages, and expected runner entry points
+- add an explicit `hcs env rebuild` command or wrapper script later that
+  recreates a named venv before starting the runner
+- never silently rebuild or delete the active venv as part of `hcs run`
+
+For highly reproducible lab runs, a future wrapper can create a clean per-run
+tool environment before invoking the runner:
+
+```bash
+./scripts/hcs-run --rebuild-venv --python python3.14 --profile check
+```
+
+That wrapper should:
+
+- create a fresh venv under the run sandbox or a configured tools directory
+- install pinned runner dependencies from a lock file
+- write `pip freeze`, Python version, Ansible version, and lock-file checksum
+  into the run artifacts
+- keep the venv path stable enough for debugging, but isolated from test
+  scratch/cache/artifact directories
+- avoid network access when a local wheelhouse or cache is configured
+
+This is a real enhancement, but it should land after the runner has stable
+config, artifact, and reporting contracts. The immediate priority is to make
+the current venv visible and auditable in every run.
 
 ## Runtime Profiles
 

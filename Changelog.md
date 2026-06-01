@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-01 - built-in system identity header
+
+- Added a built-in neofetch-style runner header for AlmaLinux controllers.
+- The runner now prints the AlmaLinux ASCII logo together with a system
+  identity table covering OS, host, kernel, uptime, RPM package count, Python
+  mode, shell, CPU, GPU, memory, swap, root filesystem, local IP, locale,
+  SELinux, and FIPS state when available.
+- The header does not require installing `fastfetch`, `neofetch`, or any
+  system-wide package; optional `fastfetch` logo support remains a presentation
+  enhancement when it already exists.
+- Added controller system identity to `config.requested.json`,
+  `run.summary.json`, and `run.report.txt` so the console header is preserved
+  as auditable certification evidence.
+- Added unit coverage for memory, swap, uptime, default route, and supplied OS
+  summary behavior.
+- Updated the development plan with explicit Python environment
+  reproducibility guidance, including future `hcs env doctor` and
+  `hcs env rebuild` style workflows.
+
 ## 2026-06-01 - GPU Burn test
 
 - Added an optional `gpu_burn` runner/Ansible test for NVIDIA systems.

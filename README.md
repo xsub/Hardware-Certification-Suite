@@ -25,11 +25,11 @@ python -m hcs run --profile check --inventory 127.0.0.1, -c local
 Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 VPS
 with Python 3.14. The command is the normal user-facing invocation: the
 timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
-`/var/tmp` as the sandbox base directory. Repeated Rich live-refresh frames are
-omitted, and color is stripped for Markdown readability. On this host
-`fastfetch` was not installed, so the built-in AlmaLinux logo fallback is
-shown. The generated run ID, recap counters, timings, and artifact paths come
-from the actual run.
+`/var/tmp` as the sandbox base directory. The identity header is built into
+HCS and does not require `fastfetch`, `neofetch`, or other system-wide helper
+packages. Repeated Rich live-refresh frames are omitted, and color is stripped
+for Markdown readability. The generated run ID, recap counters, timings,
+system facts, and artifact paths come from the actual run.
 
 ```text
 $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
@@ -55,13 +55,32 @@ $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
                 ;kkkkl
                  ,od;
 
+almalinux@vps-ac97e687.vps.ovh.net
+----------------------------------
+      OS: AlmaLinux 10.2 (Lavender Lion) x86_64
+    Host: OpenStack Foundation OpenStack Nova 19.3.2
+  Kernel: Linux 6.12.0-211.7.4.el10_2.x86_64 x86_64
+  Uptime: 2 days, 19 hours, 34 mins
+Packages: 586 (rpm)
+  Python: 3.14.4 (venv)
+   Shell: bash 5.2.26(1)-release
+     CPU: Intel Core Processor (Haswell, no TSX) (1 logical CPUs)
+     GPU: Cirrus Logic GD 5446
+  Memory: 607.7 MiB / 1.87 GiB (32%)
+    Swap: Disabled
+Disk (/): 3.92 GiB / 18.7 GiB (21%) - xfs
+Local IP: 141.95.86.222 (eth0)
+  Locale: en_US.UTF-8
+ SELinux: Enforcing
+    FIPS: disabled
+
 ╭────────────────────────────── AlmaLinux Hardware Certification Suite ──────────────────────────────╮
 │ Profile: check                                                                                      │
 │ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                               │
-│ Run ID: check-1c6e4140                                                                              │
-│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140                               │
+│ Run ID: check-3248b3e5                                                                              │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5                               │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140/runner                                 │
+│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner                                 │
 │ Inventory: 127.0.0.1,                                                                               │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
@@ -83,7 +102,7 @@ Pass 1/2: running Hardware detection
   TASK [Remove tests]
 PASS 001 pass=01/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 70.7s
+  duration 68.2s
   artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
 
 Suite progress 1/2
@@ -97,25 +116,32 @@ Pass 2/2: running Hardware detection
   TASK [Remove tests]
 PASS 002 pass=02/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 72.3s
+  duration 75.0s
   artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
 
 Suite progress 2/2
 ╭──────────────────────────────────────────── Run complete ───────────────────────────────────────────╮
 │ Sandbox:                                                                                            │
-│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140                                        │
+│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5                                        │
 │                                                                                                     │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140/runner                                 │
+│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner                                 │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 run.report.txt
   Status: passed
-  Started: 2026-06-01T11:24:44Z
-  Finished: 2026-06-01T11:27:07Z
+  Started: 2026-06-01T11:58:20Z
+  Finished: 2026-06-01T12:00:43Z
+  Controller system:
+    OS: AlmaLinux 10.2 (Lavender Lion) x86_64
+    Host: OpenStack Foundation OpenStack Nova 19.3.2
+    Kernel: Linux 6.12.0-211.7.4.el10_2.x86_64 x86_64
+    Python: 3.14.4 (venv)
+    CPU: Intel Core Processor (Haswell, no TSX) (1 logical CPUs)
+    GPU: Cirrus Logic GD 5446
   Results:
-    001 pass=01/02 hw_detection  passed  70.7s rc=0 ok
-    002 pass=02/02 hw_detection  passed  72.3s rc=0 ok
+    001 pass=01/02 hw_detection  passed  68.2s rc=0 ok
+    002 pass=02/02 hw_detection  passed  75.0s rc=0 ok
 ```
 
 ## Official Program
@@ -138,11 +164,12 @@ pages.
 ## What You Get
 
 - A guided CLI runner with Rich progress output.
-- Distro-aware runner identity: `fastfetch` logos when available, with a
-  built-in AlmaLinux logo fallback.
+- A built-in AlmaLinux identity header with logo and system facts, without
+  requiring `fastfetch`, `neofetch`, or any system-wide helper package.
 - Built-in run profiles from `check` through `extreme`.
 - One sandbox directory per certification run.
 - Plain-text reports first, with structured JSON next to them.
+- Controller system identity recorded in both human and JSON artifacts.
 - Per-step console logs and result files with consistent names.
 - Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
 - Optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) stress

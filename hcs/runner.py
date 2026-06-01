@@ -12,7 +12,9 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from rich.columns import Columns
 from rich.console import Console
+from rich.console import Group
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 from rich.table import Table
@@ -20,7 +22,7 @@ from rich.text import Text
 
 from . import __version__
 from .config import SandboxPaths
-from .identity import distro_logo
+from .identity import SystemSummary, collect_system_summary, distro_logo
 from .profiles import PROFILES, TESTS, TestSpec
 
 
@@ -122,22 +124,25 @@ class CertificationRunner:
         self.profile = PROFILES[options.profile]
         self.paths = options.paths
         self.run_dir = self.paths.runner_dir
+        self.system_summary = collect_system_summary()
 
     def selected_tests(self) -> list[TestSpec]:
         test_ids = self.options.selected_tests or self.profile.tests
         return [TESTS[test_id] for test_id in test_ids]
 
-    def render_logo(self) -> None:
+    def render_identity_header(self) -> None:
+        renderables: list[object] = []
         logo = distro_logo()
-        if logo is None:
-            return
-        if logo.ansi:
-            self.console.print(Text.from_ansi(logo.text))
-            return
-        if logo.alma_fallback:
-            self.console.print(almalinux_logo_text(logo.text))
-            return
-        self.console.print(logo.text)
+        if logo is not None:
+            if logo.ansi:
+                renderables.append(Text.from_ansi(logo.text))
+            elif logo.alma_fallback:
+                renderables.append(almalinux_logo_text(logo.text))
+            else:
+                renderables.append(logo.text)
+
+        renderables.append(system_summary_renderable(self.system_summary))
+        self.console.print(Columns(renderables, padding=(0, 4), expand=False))
 
     def render_plan(self, tests: list[TestSpec]) -> None:
         table = Table(title="Planned certification steps")
@@ -149,7 +154,7 @@ class CertificationRunner:
         for index, test in enumerate(tests, start=1):
             table.add_row(f"{index:03d}", test.display_name, test.tag, self.profile.name)
 
-        self.render_logo()
+        self.render_identity_header()
         self.console.print(
             Panel(
                 f"[bold]Profile:[/bold] {self.profile.name}\n"
@@ -225,6 +230,7 @@ class CertificationRunner:
             "extra_vars": self.options.extra_vars,
             "tests": [test.test_id for test in tests],
             "repeat": self.options.repeat,
+            "controller_system": system_summary_payload(self.system_summary),
         }
         (self.run_dir / "config.requested.json").write_text(
             json.dumps(requested, indent=2) + "\n",
@@ -266,6 +272,7 @@ class CertificationRunner:
             "started_at": started_at,
             "finished_at": finished_at,
             "paths": self.paths.as_dict(),
+            "controller_system": system_summary_payload(self.system_summary),
             "results": [
                 {
                     "step": result.step,
@@ -306,8 +313,16 @@ class CertificationRunner:
             f"Finished: {finished_at}",
             f"Runner version: {__version__}",
             "",
-            "Results:",
+            "Controller system:",
         ]
+        for fact in self.system_summary.facts:
+            lines.append(f"  {fact.label}: {fact.value}")
+        lines.extend(
+            [
+                "",
+                "Results:",
+            ]
+        )
         for result in results:
             lines.append(
                 f"  {result.step:03d} pass={result.pass_index:02d}/{result.pass_count:02d} "
@@ -512,6 +527,26 @@ def almalinux_logo_text(logo: str) -> Text:
             rendered.append(character, style=style)
         rendered.append("\n")
     return rendered
+
+
+def system_summary_renderable(summary: SystemSummary) -> Group:
+    facts = Table.grid(padding=(0, 1))
+    facts.add_column(justify="right", style="bold yellow", no_wrap=True)
+    facts.add_column(style="bold green", overflow="fold")
+    for fact in summary.facts:
+        facts.add_row(f"{fact.label}:", fact.value)
+    return Group(
+        Text(summary.title, style="bold"),
+        Text("-" * len(summary.title), style="green"),
+        facts,
+    )
+
+
+def system_summary_payload(summary: SystemSummary) -> dict[str, object]:
+    return {
+        "title": summary.title,
+        "facts": [{"label": fact.label, "value": fact.value} for fact in summary.facts],
+    }
 
 
 def render_profiles(console: Console) -> None:
