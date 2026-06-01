@@ -13,7 +13,7 @@ fi
 
 for script in "${scripts[@]}"; do
   echo "Checking ${script}"
-  bash -n "${script}"
+  "${BASH:-bash}" -n "${script}"
 done
 
 echo "Validated ${#scripts[@]} shell scripts."

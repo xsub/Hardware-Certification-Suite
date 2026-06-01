@@ -1,0 +1,51 @@
+name: Python
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke:
+    name: Python ${{ matrix.python-version }} runner smoke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.14"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install runner dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-runner.txt
+
+      - name: Compile runner package
+        run: python -m compileall hcs
+
+      - name: Render runner profile tables
+        run: |
+          python -m hcs profiles
+          python -m hcs tests
+
+      - name: Dry-run check profile
+        run: |
+          python -m hcs run \
+            --profile check \
+            --repeat 2 \
+            --dry-run \
+            --base-dir "${RUNNER_TEMP}" \
+            --run-id "github-python-${{ matrix.python-version }}"

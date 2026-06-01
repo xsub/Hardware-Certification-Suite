@@ -1,0 +1,35 @@
+name: Ansible
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-check:
+    name: Ansible syntax-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ansible-core>=2.17,<2.18"
+          ansible-galaxy collection install community.general ansible.posix
+
+      - name: Check automated playbook syntax
+        run: ansible-playbook --syntax-check -i 127.0.0.1, automated.yml
+
+      - name: Check interactive playbook syntax
+        run: ansible-playbook --syntax-check -i 127.0.0.1, interactive.yml
