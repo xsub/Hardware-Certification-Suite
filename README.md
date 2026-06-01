@@ -183,16 +183,26 @@ We recommend using a local console or in something like `screen` or `tmux`.  We 
 - tmux
 
 #### Setup Commands
-##### AlmaLinux
+##### AlmaLinux 10
 ```bash
-# install python 3.12
-dnf -y install python3.12 tmux
+# install base tools and platform Python 3.12
+dnf -y install git tmux python3.12
+
+# optional: enable CRB and use a newer Python, for example Python 3.14
+dnf -y install dnf-plugins-core
+dnf config-manager --set-enabled crb
+dnf -y install python3.14 python3.14-pip
+
+# choose python3.12 here if you prefer the platform Python
+PYTHON=python3.14
+
 # create venv
-python3.12 -m venv venv-almalinux-certification-suite
+$PYTHON -m venv venv-almalinux-certification-suite
 # activate venv
 source venv-almalinux-certification-suite/bin/activate
-# install ansible
-pip install ansible
+# install runner and ansible dependencies
+pip install "ansible-core>=2.17,<2.18"
+pip install -r requirements-runner.txt
 # start tmux session
 tmux new-session -s almalinux-certification-tests
 # run playbook
