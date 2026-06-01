@@ -46,11 +46,11 @@
     version: '20220121'
 
 - name: TEST LTP - compile
-  shell: "cd '{{ ltp_clone_path }}' ; make autotools ; ./configure >> /root/configure-ltp.log; make -j ; make install"
+  shell: "cd {{ ltp_clone_path | quote }} ; make autotools ; ./configure >> {{ (hcs_scratch_dir + '/configure-ltp.log') | quote }}; make -j ; make install"
   ignore_errors: true
 
 - name: TEST LTP - run
-  shell: "{{ sut_tests_dir }}/ltp/run_test.sh {{ test_ltp['suites'] }}"
+  shell: "{{ sut_tests_dir }}/ltp/run_test.sh {{ test_ltp['suites'] | quote }} {{ test_ltp['log_file'] | quote }}"
   register: output
   ignore_errors: true
 

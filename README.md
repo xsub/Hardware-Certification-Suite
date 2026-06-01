@@ -14,6 +14,23 @@ This repo is the home of the AlmaLinux Certification Suite.  We largely rely on 
 - screen, tmux, or local shell access
 - \>= 300GB disk space, preferably SSD/NVMe
 
+# Working directories
+By default, the suite stores working data under `/var/tmp/almalinux-certification`
+instead of `/root`. The main directories are:
+
+- `hcs_work_dir` - suite work directory, defaults to `/var/tmp/almalinux-certification`
+- `hcs_scratch_dir` - temporary files and tool scratch data
+- `hcs_cache_dir` - reserved for cached downloads and reusable assets
+- `hcs_artifacts_dir` - reserved for structured test artifacts
+- `lts_logs_dir` - timestamped logs copied to the LTS
+- `sut_tests_dir` - copied test scripts on the SUT
+
+Override the base directory with `work_dir`:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "work_dir=/mnt/certification"
+```
+
 # Suggested Run
 
 ## Local Run
@@ -177,12 +194,19 @@ Tests can be configured via `~/Hardware-Certification-Suite/vars.yml` file.
 * lts_logs_dir - LTS logs folder
 * sut_ip - SUT IP address
 * sut_tests_dir - SUT logs folder
+* hcs_work_dir - Suite work directory. Defaults to `/var/tmp/almalinux-certification`
+* hcs_scratch_dir - Scratch directory for temporary tool output
+* hcs_cache_dir - Cache directory for future reusable downloads/assets
+* hcs_artifacts_dir - Directory reserved for structured artifacts
 * test_cpu['duration'] - stop stress test after T seconds. You can specify time units in seconds, minutes, hours, days, or years with the s, m, h, d, or y suffix. If the timeout is 0, the test will run forever.
+* test_cpu['scratch_dir'] - `stress-ng` temporary path
+* test_cpu['log_file'] - temporary CPU log path on the SUT
 * test_network['duration'] - Test duration in seconds
 * test_network['speed'] - Target network test speed in Mbps
 * test_network['device'] - Testing a specific network device
 * test_raid['duration'] - Test duration in seconds
 * test_ltp['suites'] - Specify PATTERN to only run test cases which match PATTERN. By default all tests.
+* test_ltp['log_file'] - LTP full log path on the SUT
 * test_phoronix['suites'] - Define test cases
 * test_phoronix['folder'] - Specify a folder for installing tests and storing results
 
@@ -227,7 +251,7 @@ TIPS
 * Before starting testing, you need to request information about the hardware. For example, it is not necessary to run a RAID test everywhere.
 * Notify in advance of the need to prepare the number of devices equal to the number of USB ports on the server to run the USB test.
 * Testing can be delayed, it is recommended to use the screen utility. For example `screen -L -S hctest`
-* For phoronix test, you need more than 100 gigabytes of space, by default it installs dependencies in the `/root` folder, to change the section, you need to change the `test_phoronix['folder']` in the `vars.yml` file.
+* For phoronix test, you need more than 100 gigabytes of space. By default it stores test data under the suite work directory. To change the location, override `work_dir` or `test_phoronix['folder']`.
 
 ---
 This repo is managed by the [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification)

@@ -2,16 +2,24 @@
 
 # GENERAL
 _ssh_connection: "{{ hostvars[inventory_hostname]['ansible_env'].SSH_CONNECTION }}"
+hcs_work_dir: "{{ work_dir|default('/var/tmp/almalinux-certification') }}"
+hcs_scratch_dir: "{{ scratch_dir|default(hcs_work_dir + '/scratch') }}"
+hcs_cache_dir: "{{ cache_dir|default(hcs_work_dir + '/cache') }}"
+hcs_artifacts_dir: "{{ artifacts_dir|default(hcs_work_dir + '/artifacts') }}"
 lts_ip: "{{ _ssh_connection.split(' ')[0] }}"
 lts_tests_dir: "./tests"
-lts_logs_dir: "{{ unique_logs_folder|default('./logs/' + ansible_date_time.iso8601) }}"
+lts_logs_dir: "{{ unique_logs_folder|default(hcs_work_dir + '/logs/' + ansible_date_time.iso8601) }}"
 sut_ip: "{{ _ssh_connection.split(' ')[2] }}"
-sut_tests_dir: "/root/hc-tests"
+sut_tests_dir: "{{ tests_dir|default(hcs_work_dir + '/tests') }}"
 
 # CPU
 test_cpu:
   # Test duration seconds, minutes, hours, days, or years with the s, m, h, d, or y suffix.
   duration: "{{ cpu_duration|default('10m') }}"
+  # Directory used by stress-ng for temporary files.
+  scratch_dir: "{{ cpu_scratch_dir|default(hcs_scratch_dir + '/cpu') }}"
+  # Temporary log path on the SUT. Ansible still copies stdout to lts_logs_dir.
+  log_file: "{{ cpu_log_file|default(hcs_scratch_dir + '/cpu/cpu_testing.log') }}"
 
 # Network
 test_network:
@@ -57,11 +65,12 @@ test_phoronix:
       - pts/ramspeed
       - pts/stream
 
-  folder: "{{ phoronix_folder|default('/root') }}"
+  folder: "{{ phoronix_folder|default(hcs_work_dir + '/phoronix') }}"
   need_space: "{{ phoronix_need_space|default(300) }}"
 
 # LTP
 # Path to clone LTP project to SUT
-ltp_clone_path: /root/ltp
+ltp_clone_path: "{{ hcs_work_dir }}/ltp"
 test_ltp:
   suites: "{{ ltp_suites|default('all') }}"
+  log_file: "{{ ltp_log_file|default(hcs_scratch_dir + '/ltp-full.log') }}"
