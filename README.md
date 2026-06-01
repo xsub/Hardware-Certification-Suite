@@ -27,9 +27,10 @@ with Python 3.14. The command is the normal user-facing invocation: the
 timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
 `/var/tmp` as the sandbox base directory. The identity header is built into
 HCS and does not require `fastfetch`, `neofetch`, or other system-wide helper
-packages. Repeated Rich live-refresh frames are omitted, and color is stripped
-for Markdown readability. The generated run ID, recap counters, timings,
-system facts, and artifact paths come from the actual run.
+packages. Repeated Rich live-refresh frames are omitted, color is stripped for
+Markdown readability, and the host/IP values in this published excerpt are
+anonymized. The generated run ID, recap counters, timings, system facts, and
+artifact paths come from the actual run.
 
 ```text
 $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
@@ -55,8 +56,8 @@ $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
                 ;kkkkl
                  ,od;
 
-almalinux@vps-ac97e687.vps.ovh.net
-----------------------------------
+almalinux@almalinux-sut.example
+-------------------------------
       OS: AlmaLinux 10.2 (Lavender Lion) x86_64
     Host: OpenStack Foundation OpenStack Nova 19.3.2
   Kernel: Linux 6.12.0-211.7.4.el10_2.x86_64 x86_64
@@ -69,7 +70,7 @@ Packages: 586 (rpm)
   Memory: 607.7 MiB / 1.87 GiB (32%)
     Swap: Disabled
 Disk (/): 3.92 GiB / 18.7 GiB (21%) - xfs
-Local IP: 141.95.86.222 (eth0)
+Local IP: 192.0.2.10 (eth0)
   Locale: en_US.UTF-8
  SELinux: Enforcing
     FIPS: disabled
