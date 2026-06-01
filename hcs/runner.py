@@ -48,6 +48,8 @@ class RunnerOptions:
     paths: SandboxPaths
     extra_vars: dict[str, str]
     selected_tests: tuple[str, ...] | None
+    test_profiles: dict[str, str]
+    test_extra_vars: dict[str, dict[str, str]]
     repeat: int
     dry_run: bool
     stop_on_failure: bool
@@ -152,7 +154,8 @@ class CertificationRunner:
         table.add_column("Profile")
 
         for index, test in enumerate(tests, start=1):
-            table.add_row(f"{index:03d}", test.display_name, test.tag, self.profile.name)
+            step_profile = self.options.test_profiles.get(test.test_id, self.profile.name)
+            table.add_row(f"{index:03d}", test.display_name, test.tag, step_profile)
 
         self.render_identity_header()
         self.console.print(
@@ -186,7 +189,11 @@ class CertificationRunner:
             command.extend(["-c", self.options.connection])
 
         extra_vars = dict(self.profile.extra_vars)
+        step_profile = self.options.test_profiles.get(test.test_id)
+        if step_profile:
+            extra_vars.update(PROFILES[step_profile].extra_vars)
         extra_vars.update(self.options.extra_vars)
+        extra_vars.update(self.options.test_extra_vars.get(test.test_id, {}))
         sandbox_extra_vars = {
             "hcs_run_id": self.paths.run_id,
             "hcs_run_timestamp": self.paths.timestamp,
@@ -228,6 +235,8 @@ class CertificationRunner:
             "dry_run": self.options.dry_run,
             "stop_on_failure": self.options.stop_on_failure,
             "extra_vars": self.options.extra_vars,
+            "test_profiles": self.options.test_profiles,
+            "test_extra_vars": self.options.test_extra_vars,
             "tests": [test.test_id for test in tests],
             "repeat": self.options.repeat,
             "controller_system": system_summary_payload(self.system_summary),

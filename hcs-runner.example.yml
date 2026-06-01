@@ -3,6 +3,8 @@ run:
   # Generated sandboxes are created as:
   # /tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
   base_dir: /tmp
+  # Optional named preset to use when `hcs run` is called without --preset.
+  default_preset: default
   # Optional stable run id. Leave empty to generate one.
   id:
   # Optional explicit sandbox root for this run.
@@ -21,3 +23,22 @@ paths:
 
 ansible:
   extra_vars: {}
+
+presets:
+  default:
+    profile: check
+    inventory: 127.0.0.1,
+    connection: local
+    repeat: 1
+    tests:
+      hw_detection:
+        enabled: true
+        profile: check
+      gpu_burn:
+        enabled: false
+        profile: check
+        duration: 60
+        snap:
+          package: gpu-burn
+          install: false
+          remove_after: true

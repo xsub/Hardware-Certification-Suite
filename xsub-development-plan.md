@@ -98,6 +98,21 @@ The runner should clearly show:
 The operator should not need to understand internal Ansible tags to perform a
 normal certification run.
 
+Initial interactive runner behavior:
+
+- provide `hcs configure` as a Rich prompt UI for building a named preset in
+  `hcs-runner.yml`
+- show checkbox-style prompts for each known test and record whether that test
+  is enabled in the preset
+- let each enabled test choose its own profile from `check` through `extreme`
+- allow duration caps for tests that support time limits; when both a profile
+  and a duration cap are present, use the more restrictive value
+- store the default preset name under `run.default_preset`, so `hcs run` can
+  use the saved lab configuration without requiring the operator to repeat
+  flags
+- keep explicit CLI commands authoritative: `--profile` runs the normal
+  profile test list unless `--preset` is also supplied
+
 ## Distribution Identity And Portability
 
 The runner should communicate clearly which Linux platform it is running on,
@@ -615,6 +630,11 @@ Baseline `gpu_burn` workload design:
   AlmaLinux NVIDIA setup hint so the operator can fix the host without leaving
   the HCS workflow
 - use a configured/prebuilt `gpu_burn` binary when present
+- use an already installed `gpu-burn` snap when available
+- if `snapd` is available and the saved preset explicitly allows it, install
+  the `gpu-burn` snap before the workload
+- if HCS installed the snap and the preset requested cleanup, remove that snap
+  after the workload finishes
 - otherwise clone/build GPU Burn into the run cache when `git`, `make`, and
   `nvcc` are available
 - collect `nvidia-smi` telemetry before and during the workload

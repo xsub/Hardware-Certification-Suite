@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-01 - interactive presets and GPU Burn snap support
+
+- Added `hcs configure`, a Rich prompt UI for creating named runner presets in
+  `hcs-runner.yml`.
+- Presets can enable/disable tests, assign a profile from `check` through
+  `extreme` per test, set duration caps, configure repeat count, and become the
+  default preset for `hcs run`.
+- The runner now loads `run.default_preset` automatically, while an explicit
+  `--profile` keeps the classic profile-based test list unless `--preset` is
+  also supplied.
+- Added per-test profile and per-test extra-var support to the runner command
+  builder.
+- Added GPU Burn snap support: use an existing `gpu-burn` snap, optionally
+  install it when `snapd` is present and the preset allows it, and optionally
+  remove the snap at the end when HCS installed it.
+- Added duration-cap handling so a saved test duration and selected profile use
+  the more restrictive runtime where both are present.
+- Updated the example runner YAML, README, GPU Burn docs, and development plan
+  for named presets and snap-based GPU Burn setup.
+
 ## 2026-06-01 - AlmaLinux native NVIDIA guidance
 
 - Added AlmaLinux 9/10 native NVIDIA package guidance to the GPU Burn workflow.

@@ -8,6 +8,9 @@ DEVICES=${HCS_GPU_BURN_DEVICES:-}
 USE_DOUBLES=${HCS_GPU_BURN_USE_DOUBLES:-false}
 USE_TENSOR_CORES=${HCS_GPU_BURN_USE_TENSOR_CORES:-false}
 TELEMETRY_INTERVAL=${HCS_GPU_BURN_TELEMETRY_INTERVAL:-5}
+SNAP_PACKAGE=${HCS_GPU_BURN_SNAP_PACKAGE:-gpu-burn}
+INSTALL_SNAP=${HCS_GPU_BURN_INSTALL_SNAP:-false}
+REMOVE_SNAP_AFTER=${HCS_GPU_BURN_REMOVE_SNAP_AFTER:-false}
 SOURCE_URL=${HCS_GPU_BURN_SOURCE_URL:-https://github.com/wilicc/gpu-burn.git}
 SOURCE_REF=${HCS_GPU_BURN_SOURCE_REF:-master}
 SOURCE_DIR=${HCS_GPU_BURN_SOURCE_DIR:-/tmp/gpu-burn}
@@ -17,6 +20,8 @@ LOG_FILE=${HCS_GPU_BURN_LOG_FILE:-/tmp/gpu-burn.log}
 TELEMETRY_FILE=${HCS_GPU_BURN_TELEMETRY_FILE:-/tmp/gpu-burn.nvidia-smi.csv}
 RESULT_FILE=${HCS_GPU_BURN_RESULT_FILE:-/tmp/gpu-burn.result.json}
 TELEMETRY_PID=""
+GPU_BURN_MODE=""
+SNAP_INSTALLED_BY_HCS="false"
 
 mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$TELEMETRY_FILE")" "$(dirname "$RESULT_FILE")"
 : >"$LOG_FILE"
@@ -48,7 +53,11 @@ function write_result() {
   "duration": $(json_string "$DURATION"),
   "memory": $(json_string "$MEMORY"),
   "devices": $(json_string "$DEVICES"),
+  "mode": $(json_string "$GPU_BURN_MODE"),
   "binary": $(json_string "$BINARY"),
+  "snap_package": $(json_string "$SNAP_PACKAGE"),
+  "snap_installed_by_hcs": $(json_string "$SNAP_INSTALLED_BY_HCS"),
+  "snap_remove_after": $(json_string "$REMOVE_SNAP_AFTER"),
   "log_file": $(json_string "$LOG_FILE"),
   "telemetry_file": $(json_string "$TELEMETRY_FILE")
 }
@@ -100,6 +109,20 @@ function fail() {
   exit "$rc"
 }
 
+function run_privileged() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+    return
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -n "$@"
+    return
+  fi
+
+  return 127
+}
+
 function stop_telemetry() {
   if [ -n "$TELEMETRY_PID" ] && kill -0 "$TELEMETRY_PID" >/dev/null 2>&1; then
     kill "$TELEMETRY_PID" >/dev/null 2>&1 || true
@@ -107,7 +130,25 @@ function stop_telemetry() {
   fi
 }
 
-trap stop_telemetry EXIT
+function remove_snap_if_requested() {
+  if [ "$SNAP_INSTALLED_BY_HCS" != "true" ] || ! is_true "$REMOVE_SNAP_AFTER"; then
+    return
+  fi
+  if ! command -v snap >/dev/null 2>&1; then
+    return
+  fi
+
+  log "Removing snap package installed by HCS: $SNAP_PACKAGE"
+  run_privileged snap remove "$SNAP_PACKAGE" >>"$LOG_FILE" 2>&1 || \
+    log "WARNING: failed to remove snap package $SNAP_PACKAGE"
+}
+
+function cleanup() {
+  stop_telemetry
+  remove_snap_if_requested
+}
+
+trap cleanup EXIT
 
 function start_telemetry() {
   if ! command -v nvidia-smi >/dev/null 2>&1; then
@@ -142,8 +183,37 @@ function ensure_nvidia_driver() {
 
 function ensure_gpu_burn() {
   if [ -x "$BINARY" ]; then
+    GPU_BURN_MODE="binary"
     log "Using GPU Burn binary: $BINARY"
     return
+  fi
+
+  if command -v gpu-burn >/dev/null 2>&1; then
+    BINARY=$(command -v gpu-burn)
+    GPU_BURN_MODE="binary"
+    log "Using GPU Burn command on PATH: $BINARY"
+    return
+  fi
+
+  if command -v snap >/dev/null 2>&1; then
+    if snap list "$SNAP_PACKAGE" >/dev/null 2>&1; then
+      GPU_BURN_MODE="snap"
+      log "Using installed snap package: $SNAP_PACKAGE"
+      return
+    fi
+
+    if is_true "$INSTALL_SNAP"; then
+      log "Installing snap package requested by HCS config: $SNAP_PACKAGE"
+      if run_privileged snap install "$SNAP_PACKAGE" >>"$LOG_FILE" 2>&1; then
+        SNAP_INSTALLED_BY_HCS="true"
+        GPU_BURN_MODE="snap"
+        log "Installed snap package: $SNAP_PACKAGE"
+        return
+      fi
+      fail "failed to install snap package $SNAP_PACKAGE" 2
+    fi
+
+    log "Snap is available but $SNAP_PACKAGE is not installed and snap install was not enabled"
   fi
 
   if ! is_true "$BUILD_FROM_SOURCE"; then
@@ -170,12 +240,17 @@ function ensure_gpu_burn() {
     BINARY="$SOURCE_DIR/gpu_burn"
   fi
   [ -x "$BINARY" ] || fail "GPU Burn binary was not produced at $BINARY" 2
+  GPU_BURN_MODE="source"
 }
 
 ensure_nvidia_driver
 ensure_gpu_burn
 
-COMMAND=("$BINARY" "-m" "$MEMORY")
+if [ "$GPU_BURN_MODE" = "snap" ]; then
+  COMMAND=("snap" "run" "$SNAP_PACKAGE" "-m" "$MEMORY")
+else
+  COMMAND=("$BINARY" "-m" "$MEMORY")
+fi
 if [ -n "$DEVICES" ]; then
   COMMAND+=("-i" "$DEVICES")
 fi

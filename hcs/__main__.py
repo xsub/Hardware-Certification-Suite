@@ -3,12 +3,30 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from pathlib import Path
 import sys
 
 from rich.console import Console
+from rich.markup import escape
+from rich.prompt import Confirm, IntPrompt, Prompt
+import yaml
 
-from .config import build_sandbox_paths, config_extra_vars, load_config
+from .config import DEFAULT_CONFIG_PATH, build_sandbox_paths, config_extra_vars, load_config
+from .presets import (
+    DEFAULT_PRESET_NAME,
+    DURATION_VAR_BY_TEST,
+    PROFILE_ORDER,
+    config_default_preset,
+    get_preset,
+    preset_base_profile,
+    preset_extra_vars,
+    preset_positive_int,
+    preset_selected_tests,
+    preset_str,
+    preset_test_extra_vars,
+    preset_test_profiles,
+)
 from .profiles import PROFILES, TESTS
 from .runner import CertificationRunner, RunnerOptions, parse_extra_vars, render_profiles, render_tests
 
@@ -27,11 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("profiles", help="List built-in run profiles")
     subparsers.add_parser("tests", help="List known test steps")
 
+    configure = subparsers.add_parser("configure", help="Build a named runner preset with prompts")
+    configure.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    configure.add_argument("--preset", default=DEFAULT_PRESET_NAME)
+
     run = subparsers.add_parser("run", help="Run certification steps with Rich progress reporting")
     run.add_argument("--config", type=Path, help="YAML runner config; defaults to hcs-runner.yml when present")
-    run.add_argument("--profile", choices=sorted(PROFILES), default="check")
-    run.add_argument("--inventory", default="127.0.0.1,")
-    run.add_argument("-c", "--connection", default="local")
+    run.add_argument("--preset", help="Named preset from runner config; defaults to run.default_preset when set")
+    run.add_argument("--profile", choices=sorted(PROFILES))
+    run.add_argument("--inventory")
+    run.add_argument("-c", "--connection")
     run.add_argument("--playbook", type=Path, default=Path("automated.yml"))
     run.add_argument("--base-dir", type=Path, help="Base directory for generated HCS sandboxes")
     run.add_argument("--sandbox-dir", type=Path, help="Explicit sandbox root for this HCS run")
@@ -40,10 +63,140 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-dir", dest="legacy_run_dir", type=Path, help="Deprecated alias for --sandbox-dir")
     run.add_argument("--extra-var", action="append", default=[], metavar="KEY=VALUE")
     run.add_argument("--test", action="append", choices=sorted(TESTS), help="Run only this test id; repeatable")
-    run.add_argument("--repeat", type=positive_int, default=1, help="Repeat the selected test plan N times")
+    run.add_argument("--repeat", type=positive_int, help="Repeat the selected test plan N times")
     run.add_argument("--dry-run", action="store_true", help="Show plan and write dry-run artifacts without executing Ansible")
     run.add_argument("--stop-on-failure", action="store_true")
     return parser
+
+
+def load_config_for_write(path: Path) -> dict[str, object]:
+    expanded = path.expanduser()
+    if not expanded.exists():
+        return {}
+    return load_config(expanded)
+
+
+def existing_test_config(preset: Mapping[str, object] | None, test_id: str) -> Mapping[str, object]:
+    if preset is None:
+        return {}
+    tests = preset.get("tests", {})
+    if not isinstance(tests, Mapping):
+        return {}
+    value = tests.get(test_id, {})
+    return value if isinstance(value, Mapping) else {}
+
+
+def existing_test_enabled(preset: Mapping[str, object] | None, test_id: str, default: bool) -> bool:
+    if preset is None:
+        return default
+    tests = preset.get("tests", {})
+    if not isinstance(tests, Mapping) or test_id not in tests:
+        return default
+    value = tests[test_id]
+    if value is False:
+        return False
+    if isinstance(value, Mapping) and value.get("enabled") is False:
+        return False
+    return True
+
+
+def configure_preset(args: argparse.Namespace, console: Console) -> int:
+    config_path = args.config.expanduser()
+    try:
+        config = load_config_for_write(config_path)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]Failed to load config:[/red] {exc}")
+        return 2
+
+    preset_name = Prompt.ask("Preset name", default=args.preset)
+    try:
+        existing = get_preset(config, preset_name)
+    except ValueError:
+        existing = None
+
+    base_profile = Prompt.ask(
+        "Base profile",
+        choices=list(PROFILE_ORDER),
+        default=preset_base_profile(existing) or "check",
+    )
+    inventory = Prompt.ask("Inventory", default=preset_str(existing, "inventory") or "127.0.0.1,")
+    connection = Prompt.ask("Connection", default=preset_str(existing, "connection") or "local")
+    repeat = IntPrompt.ask("Repeat passes", default=preset_positive_int(existing, "repeat") or 1)
+
+    console.print()
+    console.print("[bold]Select tests[/bold]")
+    console.print("Use Enter to accept defaults. Each selected test can use its own profile.")
+
+    selected_tests: dict[str, object] = {}
+    for test_id, test in TESTS.items():
+        default_enabled = existing_test_enabled(existing, test_id, test_id in PROFILES[base_profile].tests)
+        checkbox = escape("[x]" if default_enabled else "[ ]")
+        enabled = Confirm.ask(
+            f"{checkbox} {test.display_name} ({test_id})",
+            default=default_enabled,
+        )
+        if not enabled:
+            selected_tests[test_id] = {"enabled": False}
+            continue
+
+        test_cfg = existing_test_config(existing, test_id)
+        step_profile = Prompt.ask(
+            f"  Profile for {test_id}",
+            choices=list(PROFILE_ORDER),
+            default=str(test_cfg.get("profile") or base_profile),
+        )
+        entry: dict[str, object] = {"enabled": True, "profile": step_profile}
+
+        if test_id in DURATION_VAR_BY_TEST:
+            duration = Prompt.ask(
+                "  Duration cap (empty = profile default)",
+                default=str(test_cfg.get("duration") or ""),
+            )
+            if duration:
+                entry["duration"] = duration
+
+        if test_id == "gpu_burn":
+            snap_cfg = test_cfg.get("snap", {}) if isinstance(test_cfg.get("snap", {}), Mapping) else {}
+            install_snap = Confirm.ask(
+                "  Allow installing gpu-burn snap when snapd exists and no binary is available",
+                default=bool(snap_cfg.get("install", False)),
+            )
+            remove_snap = Confirm.ask(
+                "  Remove gpu-burn snap at the end if HCS installed it",
+                default=bool(snap_cfg.get("remove_after", install_snap)),
+            )
+            entry["snap"] = {
+                "package": str(snap_cfg.get("package") or "gpu-burn"),
+                "install": install_snap,
+                "remove_after": remove_snap,
+            }
+
+        selected_tests[test_id] = entry
+
+    preset = {
+        "profile": base_profile,
+        "inventory": inventory,
+        "connection": connection,
+        "repeat": repeat,
+        "tests": selected_tests,
+    }
+    run_config = config.setdefault("run", {})
+    if not isinstance(run_config, dict):
+        console.print("[red]Cannot update config:[/red] run section must be a mapping")
+        return 2
+    run_config.setdefault("base_dir", "/tmp")
+    run_config["default_preset"] = preset_name
+
+    presets = config.setdefault("presets", {})
+    if not isinstance(presets, dict):
+        console.print("[red]Cannot update config:[/red] presets section must be a mapping")
+        return 2
+    presets[preset_name] = preset
+
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    console.print(f"\n[green]Saved preset[/green] [bold]{preset_name}[/bold] to {config_path}")
+    console.print(f"Run it with: [bold]python -m hcs run --preset {preset_name}[/bold]")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -57,16 +210,28 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "tests":
         render_tests(console)
         return 0
+    if args.command == "configure":
+        return configure_preset(args, console)
     if args.command == "run":
         try:
             config = load_config(args.config)
+            preset_name = args.preset or (None if args.profile else config_default_preset(config))
+            preset = get_preset(config, preset_name)
+            profile = args.profile or preset_base_profile(preset) or "check"
+            inventory = args.inventory or preset_str(preset, "inventory") or "127.0.0.1,"
+            connection = args.connection if args.connection is not None else (preset_str(preset, "connection") or "local")
+            repeat = args.repeat or preset_positive_int(preset, "repeat") or 1
             config_vars = config_extra_vars(config)
+            preset_vars = preset_extra_vars(preset)
             cli_vars = parse_extra_vars(args.extra_var)
-            extra_vars = {**config_vars, **cli_vars}
+            extra_vars = {**config_vars, **preset_vars, **cli_vars}
+            selected_tests = tuple(args.test) if args.test else preset_selected_tests(preset)
+            test_profiles = preset_test_profiles(preset)
+            test_extra_vars = preset_test_extra_vars(preset)
             sandbox_dir = args.sandbox_dir or args.legacy_work_dir or args.legacy_run_dir
             paths = build_sandbox_paths(
                 config=config,
-                profile=args.profile,
+                profile=profile,
                 base_dir=args.base_dir,
                 sandbox_dir=sandbox_dir,
                 run_id=args.run_id,
@@ -75,14 +240,16 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(str(exc))
 
         options = RunnerOptions(
-            profile=args.profile,
-            inventory=args.inventory,
-            connection=args.connection,
+            profile=profile,
+            inventory=inventory,
+            connection=connection,
             playbook=args.playbook,
             paths=paths,
             extra_vars=extra_vars,
-            selected_tests=tuple(args.test) if args.test else None,
-            repeat=args.repeat,
+            selected_tests=selected_tests,
+            test_profiles=test_profiles,
+            test_extra_vars=test_extra_vars,
+            repeat=repeat,
             dry_run=args.dry_run,
             stop_on_failure=args.stop_on_failure,
         )

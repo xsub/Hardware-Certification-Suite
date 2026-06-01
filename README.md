@@ -168,6 +168,8 @@ pages.
 - A built-in AlmaLinux identity header with logo and system facts, without
   requiring `fastfetch`, `neofetch`, or any system-wide helper package.
 - Built-in run profiles from `check` through `extreme`.
+- Named runner presets created by a Rich prompt UI and saved in
+  `hcs-runner.yml`.
 - One sandbox directory per certification run.
 - Plain-text reports first, with structured JSON next to them.
 - Controller system identity recorded in both human and JSON artifacts.
@@ -175,7 +177,7 @@ pages.
 - Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
 - Optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) stress
   testing when NVIDIA drivers are already installed and `nvidia-smi` can see
-  the GPUs.
+  the GPUs, with optional snap-based workload installation.
 - Coverage for the certification testing areas documented by the official
   program, including automated and interactive checks.
 
@@ -187,6 +189,7 @@ pages.
 | Python | `3.11+` for the Rich runner. CI validates Python `3.11`, `3.12`, and `3.14`. |
 | Ansible | `ansible-core>=2.17,<2.18` is the tested range. |
 | Tools | `git`, `tmux` or `screen`, and shell access. |
+| Optional snapd | Used only when a preset allows installing the `gpu-burn` snap. |
 | Storage | At least `300GB`, preferably SSD/NVMe, for long Phoronix/LTP runs. |
 
 Terminology:
@@ -211,6 +214,7 @@ cp hcs-runner.example.yml hcs-runner.yml
 
 python -m hcs profiles
 python -m hcs tests
+python -m hcs configure
 python -m hcs run --profile check --inventory 127.0.0.1, -c local
 ```
 
@@ -241,6 +245,19 @@ List available runner profiles and test IDs:
 python -m hcs profiles
 python -m hcs tests
 ```
+
+Build or update a named runner preset with the Rich prompt UI:
+
+```bash
+python -m hcs configure --preset default
+python -m hcs run --preset default
+```
+
+`hcs configure` stores the preset in `hcs-runner.yml`. It asks which tests to
+include, which profile each selected test should use, optional duration caps,
+and GPU Burn snap behavior. When `run.default_preset` is set, `python -m hcs
+run` reads that preset automatically. Passing `--profile` explicitly uses the
+profile's normal test list unless `--preset` is also supplied.
 
 Run one automated test locally through the runner:
 
@@ -311,6 +328,30 @@ The full AlmaLinux instructions are maintained in the
 HCS does not install these drivers automatically today; it detects the driver
 state, records `unsupported` when `nvidia-smi` is missing, and points the
 operator at the native AlmaLinux setup path.
+
+If `snapd` is already available on the SUT, GPU Burn can also be supplied by
+the Snap Store package. The runner only enables this when the selected preset
+asks for it:
+
+```yaml
+presets:
+  default:
+    tests:
+      gpu_burn:
+        enabled: true
+        profile: check
+        duration: 60
+        snap:
+          package: gpu-burn
+          install: true
+          remove_after: true
+```
+
+At runtime the test uses an existing `gpu-burn` binary first, then an installed
+`gpu-burn` snap, then installs the snap only when `install: true`. If HCS
+installed the snap and `remove_after: true`, it removes the snap at the end of
+the test. The GPU driver is still a prerequisite; the snap supplies the GPU
+Burn workload, not the NVIDIA driver.
 
 Use Ansible directly only for low-level debugging or when you intentionally do
 not need runner reports. Direct Ansible runs still use the sandbox defaults in
@@ -608,6 +649,9 @@ direct playbook use and advanced tuning.
 | `test_gpu_burn.duration` | GPU Burn duration in seconds. |
 | `test_gpu_burn.memory` | GPU memory target passed to `gpu_burn -m`. |
 | `test_gpu_burn.devices` | Optional GPU selection passed to `gpu_burn -i`. |
+| `test_gpu_burn.snap_package` | Snap package name used when snap mode is enabled. |
+| `test_gpu_burn.install_snap` | Install the GPU Burn snap when snapd exists and no binary/snap is already available. |
+| `test_gpu_burn.remove_snap_after` | Remove the GPU Burn snap at the end if HCS installed it. |
 | `test_gpu_burn.build_from_source` | Clone/build GPU Burn when no binary exists. |
 | `test_gpu_burn.binary` | Existing or built GPU Burn binary path. |
 | `test_gpu_burn.telemetry_file` | NVIDIA telemetry CSV collected during the run. |
