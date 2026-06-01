@@ -178,7 +178,7 @@ simplest setup uses the same host as both LTS and SUT with
 | --- | --- |
 | Detailed runner commands, profiles, presets, direct Ansible, remote SUT, sandbox layout, variables, and adding tests | [Runner and operator reference](docs/runner.md) |
 | Optional NVIDIA stress testing behavior | [GPU Burn test README](tests/gpu_burn/README.md) |
-| Long-term product and runner roadmap | [xsub development plan](xsub-development-plan.md) |
+| Long-term product and runner roadmap | [Development plan](DevelopmentPlan.md) |
 | Current follow-up tasks | [TODO](TODO.md) |
 | Official certification process | [AlmaLinux Hardware Certification](https://almalinux.org/certification/hardware-certification/) |
 

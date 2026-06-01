@@ -5,6 +5,8 @@
 - Reworked the README opening into a product-first flow with a short
   certification value statement, minimal install commands, fast `check` run,
   and one-command `certification` preset path before deeper operator details.
+- Renamed the roadmap file to `DevelopmentPlan.md` and updated the README
+  roadmap link.
 - Renamed the README value table headers to `HCS Features` and
   `Provides / Value`.
 - Removed the AlmaLinux identity row from the README feature table to keep the
@@ -228,7 +230,7 @@ This entry summarizes the work currently present in the
 
 ### Planning
 
-- Added `xsub-development-plan.md` with the broader roadmap for turning the
+- Added `DevelopmentPlan.md` with the broader roadmap for turning the
   suite into a repeatable, client-friendly, enterprise-grade hardware
   certification runner.
 - The plan covers run profiles, global YAML configuration, sandboxing,
