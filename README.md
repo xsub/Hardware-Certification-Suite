@@ -88,16 +88,137 @@ Preview a longer plan without running Ansible:
 python -m hcs run --profile medium --repeat 3 --dry-run
 ```
 
-Run one or more specific tests:
+Detailed examples for single-test and full-suite runs are in
+[Running Tests](#running-tests).
+
+## Running Tests
+
+Use the runner for normal certification work. It wraps Ansible, creates one
+sandbox per run, streams progress with Rich, writes per-step artifacts, parses
+Ansible recap counters, supports repeated passes, and produces the final
+plain-text report. The runner currently wraps `automated.yml`; interactive
+USB and PXE tests are run directly with Ansible.
+
+List available runner profiles and test IDs:
 
 ```bash
-python -m hcs run --profile short --test hw_detection --test cpu
+python -m hcs profiles
+python -m hcs tests
 ```
 
-Override an Ansible variable:
+Run one automated test locally through the runner:
+
+```bash
+python -m hcs run --profile short --test cpu --inventory 127.0.0.1, -c local
+```
+
+Run several selected tests locally through the runner:
+
+```bash
+python -m hcs run --profile medium \
+  --test hw_detection --test cpu --test network \
+  --inventory 127.0.0.1, -c local
+```
+
+Run all tests from a runner profile:
+
+```bash
+python -m hcs run --profile medium --inventory 127.0.0.1, -c local
+```
+
+Run the fullest built-in AlmaLinux automated profile, including LTP and
+Phoronix:
+
+```bash
+python -m hcs run --profile extreme --inventory 127.0.0.1, -c local
+```
+
+Run the same profile against a remote SUT:
+
+```bash
+python -m hcs run --profile extreme --inventory <SUT IP>,
+```
+
+Repeat the selected plan and keep data from every pass:
+
+```bash
+python -m hcs run --profile check --repeat 3 --inventory 127.0.0.1, -c local
+```
+
+Override an Ansible variable while using the runner:
 
 ```bash
 python -m hcs run --profile medium --extra-var cpu_duration=20m
+```
+
+Use Ansible directly only for low-level debugging or when you intentionally do
+not need runner reports. Direct Ansible runs still use the sandbox defaults in
+`vars.yml`, but they do not create runner JSON summaries, repeated-pass
+reports, or Rich progress output.
+
+Run one automated test locally with Ansible:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml --tags cpu
+```
+
+Run one automated test on a remote SUT with Ansible:
+
+```bash
+ansible-playbook -i <SUT IP>, -u root automated.yml --tags cpu
+```
+
+Run several automated tests with Ansible:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml \
+  --tags hw_detection,cpu,network
+```
+
+Run the default automated Ansible set. This runs the ordinary automated tags
+but does not run `ltp` or `phoronix`, because those tasks are tagged `never`
+and must be selected explicitly.
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml
+```
+
+Run the fullest built-in AlmaLinux automated Ansible set, including LTP and
+Phoronix:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml \
+  --tags hw_detection,containers,kvm,cpu,network,raid,ltp,phoronix
+```
+
+Run the same full automated set on a remote SUT:
+
+```bash
+ansible-playbook -i <SUT IP>, -u root automated.yml \
+  --tags hw_detection,containers,kvm,cpu,network,raid,ltp,phoronix
+```
+
+The `cllimits` tag is CloudLinux-specific. It is not part of the AlmaLinux
+full automated set and is skipped on AlmaLinux systems.
+
+Override the direct Ansible sandbox when needed:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml \
+  --extra-vars "sandbox_dir=/mnt/certification/run-001"
+```
+
+Run all interactive tests:
+
+```bash
+ansible-playbook -i <SUT IP>, -u root interactive.yml
+```
+
+Run one interactive test family directly:
+
+```bash
+ansible-playbook -i <SUT IP>, -u root tests/usb/step1.yml tests/usb/step2.yml
+ansible-playbook -i <SUT IP>, -u root tests/pxe/step1.yml tests/pxe/step2.yml
 ```
 
 ## AlmaLinux 10 Setup
@@ -296,26 +417,6 @@ python -m hcs run --profile check --inventory <SUT IP>,
 Full certification runs can take 2 to 5 days depending on the device resources.
 Use `tmux` or `screen` on the LTS so the session survives network
 interruptions.
-
-## Direct Ansible Usage
-
-The Rich runner is preferred because it creates consistent run artifacts and
-interprets Ansible recap output. Direct Ansible execution is still useful for
-low-level debugging:
-
-```bash
-ansible-playbook -c local -i 127.0.0.1, automated.yml
-ansible-playbook -i <SUT IP>, automated.yml --tags cpu
-ansible-playbook -i <SUT IP>, interactive.yml
-```
-
-Direct Ansible runs use the same sandbox defaults from `vars.yml`. Override
-the sandbox explicitly when needed:
-
-```bash
-ansible-playbook -c local -i 127.0.0.1, automated.yml \
-  --extra-vars "sandbox_dir=/mnt/certification/run-001"
-```
 
 ## Test Tags
 
