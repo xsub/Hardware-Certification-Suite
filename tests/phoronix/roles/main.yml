@@ -70,6 +70,20 @@
           - glfw-devel
       when: ansible_architecture == "x86_64"
 
+    - name: Phoronix - use EL10 Python sklearn package name
+      ansible.builtin.replace:
+        path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
+        regexp: 'python-scikit-learn'
+        replace: 'python3-scikit-learn'
+      when: ansible_facts['distribution_major_version'] | int >= 10
+
+    - name: Phoronix - remove unavailable EL10 SDL_sound dependency
+      ansible.builtin.replace:
+        path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
+        regexp: ' SDL_sound-devel'
+        replace: ''
+      when: ansible_facts['distribution_major_version'] | int >= 10
+
     - name: Phoronix - copy config on SUT
       copy:
         src: "{{ lts_tests_dir }}/phoronix/sources/phoronix-test-suite.xml"

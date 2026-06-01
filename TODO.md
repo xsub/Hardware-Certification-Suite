@@ -1,3 +1,12 @@
-```
-fatal: [170.249.210.154]: FAILED! => {"changed": false, "failures": ["No package openscad available.", "No package python-scikit-learn available.", "No package SDL_sound-devel available."], "msg": "Failed to install some of the specified packages", "rc": 1, "results": []}
-```
+# TODO
+
+## Phoronix on AlmaLinux 10
+
+- [x] Handle stale Phoronix Fedora dependency names on AlmaLinux 10:
+  `python-scikit-learn` is provided as `python3-scikit-learn`, and
+  `SDL_sound-devel` is not available in the enabled AlmaLinux 10.2, CRB, and
+  EPEL repositories on the validation VPS.
+- [x] Confirm `openscad` is available from EPEL on the AlmaLinux 10.2
+  validation VPS once the Phoronix role enables the required repositories.
+- [ ] Revisit this compatibility patch when Phoronix/EPEL updates its Fedora
+  dependency metadata or when `SDL_sound-devel` becomes available for EL10.
