@@ -5,13 +5,16 @@
 - Reworked the README opening into a product-first flow with a short
   certification value statement, minimal install commands, fast `check` run,
   and one-command `certification` preset path before deeper operator details.
+- Reduced the README to a concise onboarding page and moved detailed runner,
+  Ansible, preset, GPU Burn, sandbox, remote SUT, profile, and variable
+  reference material into `docs/runner.md`.
 - Condensed the runner console preview while keeping the AlmaLinux identity
   header, planned steps, repeated pass output, artifact names, and final
   report summary visible near the top.
-- Moved detailed runner, Ansible, preset, GPU Burn, sandbox, and variable
-  guidance under an explicit technical reference section.
 - Removed the repository-local `.vscode` settings file and ignored `.vscode/`
   so editor state does not return to the fork.
+- Replaced validation machine wording in TODO with generic "validation host"
+  wording.
 
 ## 2026-06-01 - certification policy preset
 
