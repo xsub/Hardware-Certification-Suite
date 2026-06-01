@@ -16,6 +16,7 @@ This repo is the home of the AlmaLinux Certification Suite.  We largely rely on 
 # Common Requirements
 - SUT should be a blank, freshly installed and updated AlmaLinux system.
 - ansible >= 2.17 (older may work, but is untested)
+- Python >= 3.11 for the Rich CLI runner
 - git
 - screen, tmux, or local shell access
 - \>= 300GB disk space, preferably SSD/NVMe
@@ -49,11 +50,14 @@ ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "sandbox_dir=
 # Rich CLI runner
 The Python runner wraps the Ansible suite with a Rich console UI, predefined
 test-length profiles, repeatable passes, and consistent per-run artifacts.
+The runner supports Python 3.11 and newer. Python 3.11 is the lowest supported
+version; the current code and dependencies are validated in CI on Python 3.11,
+3.12, and 3.14.
 
 Install it in the same virtual environment as Ansible:
 
 ```bash
-python3.12 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install ansible
 pip install -r requirements-runner.txt
