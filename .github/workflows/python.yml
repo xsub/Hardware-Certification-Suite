@@ -37,16 +37,24 @@ jobs:
       - name: Compile runner package
         run: python -m compileall hcs
 
+      - name: Run Python unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
       - name: Render runner profile tables
         run: |
           python -m hcs profiles
           python -m hcs tests
+
+      - name: Configure runner sandbox
+        run: |
+          cat > hcs-runner.yml <<EOF
+          run:
+            base_dir: ${RUNNER_TEMP}
+          EOF
 
       - name: Dry-run check profile
         run: |
           python -m hcs run \
             --profile check \
             --repeat 2 \
-            --dry-run \
-            --base-dir "${RUNNER_TEMP}" \
-            --run-id "github-python-${{ matrix.python-version }}"
+            --dry-run

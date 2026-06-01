@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("tests", help="List known test steps")
 
     run = subparsers.add_parser("run", help="Run certification steps with Rich progress reporting")
-    run.add_argument("--config", type=Path, help="YAML runner config with sandbox path settings")
+    run.add_argument("--config", type=Path, help="YAML runner config; defaults to hcs-runner.yml when present")
     run.add_argument("--profile", choices=sorted(PROFILES), default="check")
     run.add_argument("--inventory", default="127.0.0.1,")
     run.add_argument("-c", "--connection", default="local")

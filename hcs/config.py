@@ -12,6 +12,7 @@ import yaml
 
 
 DEFAULT_BASE_DIR = Path("/tmp")
+DEFAULT_CONFIG_PATH = Path("hcs-runner.yml")
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,11 @@ class SandboxPaths:
 
 def load_config(path: Path | None) -> dict[str, object]:
     if path is None:
-        return {}
+        path = Path.cwd() / DEFAULT_CONFIG_PATH
+        if not path.exists():
+            return {}
+    else:
+        path = path.expanduser()
 
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}

@@ -76,6 +76,7 @@ python3.11 -m venv venv
 source venv/bin/activate
 pip install "ansible-core>=2.17,<2.18"
 pip install -r requirements-runner.txt
+cp hcs-runner.example.yml hcs-runner.yml
 
 python -m hcs profiles
 python -m hcs tests
@@ -98,6 +99,10 @@ sandbox per run, streams progress with Rich, writes per-step artifacts, parses
 Ansible recap counters, supports repeated passes, and produces the final
 plain-text report. The runner currently wraps `automated.yml`; interactive
 USB and PXE tests are run directly with Ansible.
+
+Keep lab-wide runner defaults in `hcs-runner.yml`. The runner loads this file
+automatically from the repository directory, so normal commands do not need a
+manual timestamp, run ID, or base directory.
 
 List available runner profiles and test IDs:
 
@@ -244,6 +249,9 @@ $PYTHON -m venv venv-almalinux-certification-suite
 source venv-almalinux-certification-suite/bin/activate
 pip install "ansible-core>=2.17,<2.18"
 pip install -r requirements-runner.txt
+cp hcs-runner.example.yml hcs-runner.yml
+
+# Optional for larger runs: edit hcs-runner.yml and set run.base_dir: /var/tmp
 
 tmux new-session -s almalinux-certification-tests
 python -m hcs run --profile check --inventory 127.0.0.1, -c local
@@ -293,18 +301,32 @@ For remote LTS/SUT runs, Ansible transfers command output from the SUT into
 the LTS/controller sandbox so results survive SUT cleanup. For local runs, the
 same paths are used directly; no separate copy step is needed.
 
-Control the sandbox from the CLI:
+Configure the sandbox once per lab checkout:
 
 ```bash
-python -m hcs run --profile check --base-dir /var/tmp
-python -m hcs run --profile check --run-id lab-run-001
-python -m hcs run --profile check --sandbox-dir /mnt/certification/AlmaLinux-HCS-lab-run-001
+cp hcs-runner.example.yml hcs-runner.yml
 ```
 
-Or keep the paths in YAML:
+Edit `hcs-runner.yml`:
+
+```yaml
+run:
+  base_dir: /var/tmp
+  id:
+  sandbox_dir:
+```
+
+`hcs-runner.yml` is auto-loaded when present. Leave `run.id` empty for an
+auto-generated run ID. Leave `run.sandbox_dir` empty for the standard
+`AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>` directory name under
+`run.base_dir`.
+
+Use CLI overrides only when automation needs them:
 
 ```bash
-python -m hcs run --config hcs-runner.example.yml --profile check
+python -m hcs run --config lab-runner.yml --profile check
+python -m hcs run --profile check --run-id lab-run-001
+python -m hcs run --profile check --sandbox-dir /mnt/certification/AlmaLinux-HCS-lab-run-001
 ```
 
 `hcs-runner.example.yml` keeps all configurable child paths inside the sandbox
@@ -323,22 +345,22 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 
 Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 VPS
-with Python 3.14. Repeated Rich live-refresh frames are omitted, but the
-commands, pass/fail results, recap counters, timings, and artifact paths come
-from the actual run.
+with Python 3.14. The command is the normal user-facing invocation: the
+timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
+`/var/tmp` as the sandbox base directory. Repeated Rich live-refresh frames are
+omitted, but the generated run ID, recap counters, timings, and artifact paths
+come from the actual run.
 
 ```text
-$ python -m hcs run --profile check --repeat 2 \
-    --run-id readme-real-check-20260601T005959Z \
-    --base-dir /var/tmp --inventory 127.0.0.1, -c local
+$ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
 
 ╭────────────────────────────── AlmaLinux Hardware Certification Suite ──────────────────────────────╮
 │ Profile: check                                                                                      │
 │ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                               │
-│ Run ID: readme-real-check-20260601T005959Z                                                          │
-│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z           │
+│ Run ID: check-c835e151                                                                              │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151                               │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z/runner             │
+│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151/runner                                 │
 │ Inventory: 127.0.0.1,                                                                               │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
@@ -360,7 +382,7 @@ Pass 1/2: running Hardware detection
   TASK [Remove tests]
 PASS 001 pass=01/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 36.7s
+  duration 64.8s
   artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
 
 Suite progress 1/2
@@ -374,25 +396,25 @@ Pass 2/2: running Hardware detection
   TASK [Remove tests]
 PASS 002 pass=02/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 33.8s
+  duration 65.9s
   artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
 
 Suite progress 2/2
 ╭──────────────────────────────────────────── Run complete ───────────────────────────────────────────╮
 │ Sandbox:                                                                                            │
-│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z                    │
+│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151                                        │
 │                                                                                                     │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T005959Z-RunID-readme-real-check-20260601T005959Z/runner             │
+│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151/runner                                 │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 run.report.txt
   Status: passed
-  Started: 2026-06-01T00:59:59Z
-  Finished: 2026-06-01T01:01:09Z
+  Started: 2026-06-01T01:13:27Z
+  Finished: 2026-06-01T01:15:37Z
   Results:
-    001 pass=01/02 hw_detection  passed  36.7s rc=0 ok
-    002 pass=02/02 hw_detection  passed  33.8s rc=0 ok
+    001 pass=01/02 hw_detection  passed  64.8s rc=0 ok
+    002 pass=02/02 hw_detection  passed  65.9s rc=0 ok
 ```
 
 ## Remote LTS/SUT

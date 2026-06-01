@@ -1,4 +1,5 @@
 run:
+  # Copy this file to hcs-runner.yml. The runner auto-loads that local file.
   # Generated sandboxes are created as:
   # /tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
   base_dir: /tmp
