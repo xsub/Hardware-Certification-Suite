@@ -7,6 +7,8 @@
   and one-command `certification` preset path before deeper operator details.
 - Renamed the README value table headers to `HCS Features` and
   `Provides / Value`.
+- Removed the AlmaLinux identity row from the README feature table to keep the
+  top-level value list tighter.
 - Reduced the README to a concise onboarding page and moved detailed runner,
   Ansible, preset, GPU Burn, sandbox, remote SUT, profile, and variable
   reference material into `docs/runner.md`.

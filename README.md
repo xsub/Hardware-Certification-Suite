@@ -54,7 +54,6 @@ when selected tests need package installation or direct hardware access.
 | Sandboxed evidence | Each run gets one `AlmaLinux-HCS-<timestamp>-RunID-<id>` directory with consistent report, log, and artifact names. |
 | Repeatable burn-in | Profiles from `check` through `extreme`, repeated passes, named presets, and per-test duration/profile controls. |
 | Plain-text first reports | `run.report.txt` is readable by engineers; JSON summaries sit next to it for automation. |
-| AlmaLinux-first identity | The runner prints a built-in AlmaLinux logo and system facts without requiring `fastfetch` or `neofetch`. |
 
 ## Console Preview
 
