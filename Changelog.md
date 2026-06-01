@@ -19,6 +19,8 @@
   the more restrictive runtime where both are present.
 - Updated the example runner YAML, README, GPU Burn docs, and development plan
   for named presets and snap-based GPU Burn setup.
+- Added README text screenshots for the preset configuration prompts, saved
+  YAML, and dry-run test plan preview.
 
 ## 2026-06-01 - AlmaLinux native NVIDIA guidance
 

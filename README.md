@@ -259,6 +259,108 @@ and GPU Burn snap behavior. When `run.default_preset` is set, `python -m hcs
 run` reads that preset automatically. Passing `--profile` explicitly uses the
 profile's normal test list unless `--preset` is also supplied.
 
+Configuration selection example:
+
+```text
+$ python -m hcs configure --preset gpu-burn-check
+
+Preset name (gpu-burn-check): gpu-burn-check
+Base profile [check/short/medium/long/very_long/extreme] (check): check
+Inventory (127.0.0.1,): 127.0.0.1,
+Connection (local): local
+Repeat passes (1): 2
+
+Select tests
+Use Enter to accept defaults. Each selected test can use its own profile.
+
+[x] Hardware detection (hw_detection) [y/n] (y): y
+  Profile for hw_detection [check/short/medium/long/very_long/extreme] (check): check
+
+[ ] Containers (containers) [y/n] (n): n
+[ ] KVM (kvm) [y/n] (n): n
+[ ] CPU stress (cpu) [y/n] (n): n
+[ ] Network (network) [y/n] (n): n
+[ ] MD RAID (raid) [y/n] (n): n
+[ ] Linux Test Project (ltp) [y/n] (n): n
+[ ] Phoronix (phoronix) [y/n] (n): n
+
+[ ] GPU Burn (gpu_burn) [y/n] (n): y
+  Profile for gpu_burn [check/short/medium/long/very_long/extreme] (check): medium
+  Duration cap (empty = profile default): 5m
+  Allow installing gpu-burn snap when snapd exists and no binary is available [y/n] (n): y
+  Remove gpu-burn snap at the end if HCS installed it [y/n] (y): y
+
+[ ] CloudLinux limits (cllimits) [y/n] (n): n
+
+Saved preset gpu-burn-check to hcs-runner.yml
+Run it with: python -m hcs run --preset gpu-burn-check
+```
+
+Saved preset excerpt:
+
+```yaml
+run:
+  base_dir: /tmp
+  default_preset: gpu-burn-check
+
+presets:
+  gpu-burn-check:
+    profile: check
+    inventory: 127.0.0.1,
+    connection: local
+    repeat: 2
+    tests:
+      hw_detection:
+        enabled: true
+        profile: check
+      gpu_burn:
+        enabled: true
+        profile: medium
+        duration: 5m
+        snap:
+          package: gpu-burn
+          install: true
+          remove_after: true
+```
+
+Plan preview from the saved preset. The identity header is omitted here so the
+example focuses on test selection:
+
+```text
+$ python -m hcs run --preset gpu-burn-check --dry-run
+
+╭─────────────────── AlmaLinux Hardware Certification Suite ───────────────────╮
+│ Profile: check                                                               │
+│ Mode: Fast sanity pass for runner, inventory, and hardware discovery.        │
+│ Run ID: check-4f21a9c0                                                       │
+│ Sandbox: /tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0            │
+│ Runner artifacts:                                                            │
+│ /tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0/runner              │
+│ Inventory: 127.0.0.1,                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+             Planned certification steps
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃   # ┃ Test               ┃ Tag          ┃ Profile ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ 001 │ Hardware detection │ hw_detection │ check   │
+│ 002 │ GPU Burn           │ gpu_burn     │ medium  │
+└─────┴────────────────────┴──────────────┴─────────┘
+Repeat: 2 passes, 4 total steps
+
+SKIP 001 pass=01/02 Hardware detection
+SKIP 002 pass=01/02 GPU Burn
+SKIP 003 pass=02/02 Hardware detection
+SKIP 004 pass=02/02 GPU Burn
+
+run.report.txt
+  Status: passed
+  Results:
+    001 pass=01/02 hw_detection  skipped  0.0s rc=None dry-run
+    002 pass=01/02 gpu_burn      skipped  0.0s rc=None dry-run
+    003 pass=02/02 hw_detection  skipped  0.0s rc=None dry-run
+    004 pass=02/02 gpu_burn      skipped  0.0s rc=None dry-run
+```
+
 Run one automated test locally through the runner:
 
 ```bash
