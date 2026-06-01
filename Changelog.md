@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-01 - generic Linux and accelerator roadmap
+
+- Added distro-aware runner logo support.
+- The runner now attempts to use `fastfetch` for the detected Linux
+  distribution when available.
+- Added a built-in AlmaLinux ASCII logo fallback for AlmaLinux systems where
+  `fastfetch` is not installed.
+- Added unit coverage for `/etc/os-release` parsing and AlmaLinux logo
+  fallback behavior.
+- Updated the development plan with a more generic Linux positioning: keep the
+  project AlmaLinux-first while making runner patterns, artifact contracts, and
+  burn-in workflows useful for other Linux projects.
+- Added roadmap sections for distribution identity, portability, enterprise
+  burn-in, continuous validation, post-change validation, RMA triage, and
+  long-running system readiness testing.
+- Added an AI/GPU/CUDA/VFX workload track proposal covering GPU detection,
+  NVIDIA driver validation, CUDA smoke/burn tests, telemetry collection, and
+  future graphics workloads such as AlmaLinux-branded 3D render scenes.
+
 ## 2026-06-01 - xsub fork development delta
 
 This entry summarizes the work currently present in the

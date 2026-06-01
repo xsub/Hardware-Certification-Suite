@@ -19,6 +19,9 @@ comparison, and long-term certification records.
 - Use stable schemas for config, profiles, artifacts, events, metrics, and
   reports.
 - Design the text runner with GUI integration in mind from the beginning.
+- Keep the suite AlmaLinux-first but Linux-generic where possible, so other
+  enterprise Linux projects can reuse the runner patterns, artifact contracts,
+  and burn-in workflows.
 - Prefer incremental, mergeable PRs over one large rewrite.
 
 ## Current Issue Triage
@@ -42,6 +45,30 @@ broader suite-quality context.
   directories, profiles, runner, cache, and reporting exist.
 - `#6`, `#11`, `#12` MariaDB and ISV involvement: valid, but should become an
   extension framework, with MariaDB as the first concrete plugin/test pack.
+
+## Strategic Product Direction
+
+The suite should be useful beyond a narrow certification checklist. AlmaLinux
+Hardware Certification can become a practical enterprise validation platform
+that demonstrates AlmaLinux as a dependable base for modern infrastructure,
+AI, VFX, virtualization, storage, networking, and long-running production
+workloads.
+
+From a product and ecosystem perspective, the strongest ROI comes from:
+
+- making AlmaLinux easier to validate on new enterprise installations
+- giving IHVs, ISVs, homelab users, AI teams, and infrastructure operators a
+  repeatable way to prove a system is ready for real work
+- producing credible, shareable artifacts that support certification,
+  benchmarking, support cases, and procurement decisions
+- making the runner generic enough that other Linux projects can borrow the
+  tooling model while AlmaLinux remains the best-integrated reference platform
+- creating test packs that map to commercially important use cases: AI/GPU,
+  virtualization, containers, databases, storage, networking, and long burn-in
+  stability
+
+The project should therefore treat certification, burn-in, benchmarking, and
+system readiness as related workflows over the same runner core.
 
 ## Target User Experience
 
@@ -70,6 +97,37 @@ The runner should clearly show:
 
 The operator should not need to understand internal Ansible tags to perform a
 normal certification run.
+
+## Distribution Identity And Portability
+
+The runner should communicate clearly which Linux platform it is running on,
+without making the core runner impossible to reuse elsewhere.
+
+Initial behavior:
+
+- detect the local distribution from `/etc/os-release`
+- if `fastfetch` is available, use it to render a distro logo for the detected
+  Linux distribution
+- if the detected system is AlmaLinux and `fastfetch` is not available, render
+  a built-in AlmaLinux ASCII logo
+- record distribution identity in the requested/effective config and run
+  manifest
+- keep UI branding AlmaLinux-first while keeping executor, profiles, artifacts,
+  and report formats generic
+
+Future behavior:
+
+- include distro facts in every report: ID, version, kernel, architecture,
+  virtualization, container status, SELinux mode, FIPS mode, CPU, memory, GPU,
+  storage, network, firmware, and secure boot state
+- allow downstream projects to provide their own branding/logo/plugin layer
+  without forking the runner core
+- split tests into generic Linux tests, AlmaLinux-specific tests, and
+  vendor/plugin tests
+- mark unsupported distro-specific tests as `unsupported`, not failed
+- provide a clean compatibility matrix showing which tests are generic and
+  which require AlmaLinux, EPEL, vendor repositories, or hardware-specific
+  drivers
 
 ## Runtime Profiles
 
@@ -148,6 +206,61 @@ profiles:
         enabled: true
         suites: smoke
 ```
+
+## Burn-In And Continuous Validation Profiles
+
+Many operators need more than one certification run. A new AlmaLinux-based
+enterprise installation often needs a burn-in mode that can run for hours or
+days, surface intermittent failures, and prove the system remains stable under
+realistic sustained pressure.
+
+Recommended additional operating modes:
+
+- `burn_in_short`: 1 to 4 hour functional soak for new lab systems
+- `burn_in_medium`: overnight validation for new production hosts
+- `burn_in_long`: 24 to 72 hour pre-production acceptance
+- `continuous`: recurring validation loop for dedicated validation systems
+- `post_change`: focused validation after firmware, kernel, driver, BIOS, or
+  hardware changes
+- `rma_triage`: stress-focused mode for suspicious or flaky systems
+
+Burn-in should collect:
+
+- thermal data
+- CPU frequency and throttling data
+- memory pressure and ECC/MCE events
+- disk SMART/NVMe health
+- storage latency and error counters
+- network link state, retransmits, drops, and throughput variance
+- GPU temperature, clocks, ECC, power, and reset events where applicable
+- kernel logs, warnings, machine checks, and OOM events
+- time-series metrics so spikes and instability are visible
+
+Useful burn-in workload families:
+
+- CPU integer and floating point stress
+- memory bandwidth and allocation stress
+- storage sustained write/read and latency stress
+- network throughput and packet-loss stress
+- virtualization and container churn
+- mixed workload mode combining CPU, memory, disk, network, and optional GPU
+- idle stability mode that catches firmware, suspend, clock, or power issues
+
+The runner should support long-running operation ergonomics:
+
+- tmux/screen-friendly output
+- periodic checkpointing
+- resumable runs
+- heartbeat files
+- watchdog warnings
+- configurable sampling interval
+- graceful stop with partial report
+- periodic report snapshots
+- optional systemd timer/service integration for continuous validation
+
+Prime95-like value comes from sustained, repeatable pressure plus credible
+evidence. HCS should not clone a single stress tool; it should orchestrate the
+right combination of stressors, sensors, logs, and reports.
 
 ## Config Model
 
@@ -388,6 +501,78 @@ Metrics should support:
 - per-run aggregate summaries
 - outlier flags
 - warning thresholds
+
+## AI, GPU, CUDA, And VFX Workload Track
+
+AI-enabled and GPU-heavy environments are a strong opportunity for AlmaLinux.
+The suite should grow a dedicated accelerator test track that validates whether
+AlmaLinux is ready for CUDA, AI inference/training, rendering, and VFX-style
+workloads on real hardware.
+
+The first goal is not to replace vendor validation suites. The goal is to make
+AlmaLinux a credible, easy-to-test base layer for GPU-enabled systems.
+
+Recommended test IDs:
+
+- `gpu_detection`: detect PCI GPU devices, driver state, kernel modules, IOMMU,
+  display/compute role, firmware, and relevant logs
+- `nvidia_driver`: validate NVIDIA driver installation state and collect
+  `nvidia-smi` facts
+- `cuda_smoke`: compile and run a tiny CUDA program that exercises memory copy,
+  kernel launch, and basic floating-point computation
+- `cuda_burn`: longer CUDA stress workload with temperature, power, clock, ECC,
+  and error monitoring
+- `gpu_vfx`: graphics-oriented workload for display/VFX cards using OpenGL,
+  Vulkan, or Blender where available
+- `gpu_ai`: AI-oriented workload using CUDA libraries, ONNX Runtime, PyTorch, or
+  TensorRT where licensing and repository setup allow it
+
+Hardware discovery should reuse existing artifacts where possible:
+
+- consume `hw_detection` output if present
+- fall back to direct probing with `lspci`, `lsmod`, `modinfo`, `dmesg`,
+  `/sys`, `nvidia-smi`, `rocm-smi`, `vulkaninfo`, and `glxinfo`
+- classify devices as AI accelerator, graphics/VFX GPU, integrated GPU,
+  passthrough/virtual GPU, or unsupported/unknown
+- record device IDs, vendor IDs, driver versions, firmware versions, PCIe link
+  speed/width, BAR/resizable BAR, NUMA locality, and thermal/power capabilities
+
+Driver installation must be careful:
+
+- default to detect/report mode
+- require an explicit config flag before installing vendor drivers
+- support offline/local repository paths
+- record every repository and package installed
+- detect Secure Boot and DKMS/kernel-devel prerequisites before modifying the
+  system
+- produce a clear warning when driver installation would make the system
+  non-compliant with the operator's policy
+
+CUDA workload design:
+
+- start with a small C/CUDA program built with `nvcc` when available
+- add a Rust/CUDA path only after the C smoke test is stable
+- test host-to-device copy, device-to-host copy, kernel launch, synchronization,
+  memory bandwidth, and numerical correctness
+- collect `nvidia-smi --query-gpu` telemetry before, during, and after the run
+- keep raw build logs, binary metadata, telemetry, and result JSON
+- fail on correctness errors, device resets, Xid errors, ECC errors, thermal
+  shutdown, or driver/runtime mismatch
+
+For graphics/VFX GPUs, a visually meaningful workload could render many
+revolving AlmaLinux logo meshes, particles, or shader-heavy scenes. This should
+be treated as a future optional workload:
+
+- first use proven tools such as Blender benchmark, glmark2, vkmark, or
+  Phoronix GPU suites where packages and licensing permit
+- later add a custom open scene that renders AlmaLinux-branded geometry and
+  produces deterministic frame timing and image artifacts
+- keep the renderer optional and headless-friendly using EGL/Vulkan offscreen
+  modes where possible
+
+The accelerator track should support NVIDIA first because CUDA is the most
+urgent enterprise AI target. The architecture should leave room for AMD ROCm,
+Intel GPU/oneAPI, and non-GPU accelerators.
 
 ## Event Stream
 

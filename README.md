@@ -26,19 +26,42 @@ Excerpt from a real two-pass `check` run captured on an AlmaLinux 10.2 VPS
 with Python 3.14. The command is the normal user-facing invocation: the
 timestamp and run ID are generated automatically, and `hcs-runner.yml` supplies
 `/var/tmp` as the sandbox base directory. Repeated Rich live-refresh frames are
-omitted, but the generated run ID, recap counters, timings, and artifact paths
-come from the actual run.
+omitted, and color is stripped for Markdown readability. On this host
+`fastfetch` was not installed, so the built-in AlmaLinux logo fallback is
+shown. The generated run ID, recap counters, timings, and artifact paths come
+from the actual run.
 
 ```text
 $ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
 
+         'c:.
+        lkkkx, ..       ..   ,cc,
+        okkkk:ckkx'  .lxkkx.okkkkd
+        .:llcokkx'  :kkkxkko:xkkd,
+      .xkkkkdood:  ;kx,  .lkxlll;
+       xkkx.       xk'     xkkkkk:
+       'xkx.       xd      .....,.
+      .. :xkl'     :c      ..''..
+    .dkx'  .:ldl:'. '  ':lollldkkxo;
+  .''lkkko'                     ckkkx.
+'xkkkd:kkd.       ..  ;'        :kkxo.
+,xkkkd;kk'      ,d;    ld.   ':dkd::cc,
+ .,,.;xkko'.';lxo.      dx,  :kkk'xkkkkc
+     'dkkkkkxo:.        ;kx  .kkk:;xkkd.
+       .....   .;dk:.   lkk.  :;,
+             :kkkkkkkdoxkkx
+              ,c,,;;;:xkkd.
+                ;kkkkl...
+                ;kkkkl
+                 ,od;
+
 ╭────────────────────────────── AlmaLinux Hardware Certification Suite ──────────────────────────────╮
 │ Profile: check                                                                                      │
 │ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                               │
-│ Run ID: check-c835e151                                                                              │
-│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151                               │
+│ Run ID: check-1c6e4140                                                                              │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140                               │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151/runner                                 │
+│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140/runner                                 │
 │ Inventory: 127.0.0.1,                                                                               │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
@@ -60,7 +83,7 @@ Pass 1/2: running Hardware detection
   TASK [Remove tests]
 PASS 001 pass=01/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 64.8s
+  duration 70.7s
   artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
 
 Suite progress 1/2
@@ -74,25 +97,25 @@ Pass 2/2: running Hardware detection
   TASK [Remove tests]
 PASS 002 pass=02/02 Hardware detection
   recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 65.9s
+  duration 72.3s
   artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
 
 Suite progress 2/2
 ╭──────────────────────────────────────────── Run complete ───────────────────────────────────────────╮
 │ Sandbox:                                                                                            │
-│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151                                        │
+│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140                                        │
 │                                                                                                     │
 │ Runner artifacts:                                                                                   │
-│ /var/tmp/AlmaLinux-HCS-20260601T011327Z-RunID-check-c835e151/runner                                 │
+│ /var/tmp/AlmaLinux-HCS-20260601T112444Z-RunID-check-1c6e4140/runner                                 │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 run.report.txt
   Status: passed
-  Started: 2026-06-01T01:13:27Z
-  Finished: 2026-06-01T01:15:37Z
+  Started: 2026-06-01T11:24:44Z
+  Finished: 2026-06-01T11:27:07Z
   Results:
-    001 pass=01/02 hw_detection  passed  64.8s rc=0 ok
-    002 pass=02/02 hw_detection  passed  65.9s rc=0 ok
+    001 pass=01/02 hw_detection  passed  70.7s rc=0 ok
+    002 pass=02/02 hw_detection  passed  72.3s rc=0 ok
 ```
 
 ## Official Program
@@ -115,6 +138,8 @@ pages.
 ## What You Get
 
 - A guided CLI runner with Rich progress output.
+- Distro-aware runner identity: `fastfetch` logos when available, with a
+  built-in AlmaLinux logo fallback.
 - Built-in run profiles from `check` through `extreme`.
 - One sandbox directory per certification run.
 - Plain-text reports first, with structured JSON next to them.

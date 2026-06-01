@@ -16,9 +16,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 from rich.table import Table
+from rich.text import Text
 
 from . import __version__
 from .config import SandboxPaths
+from .identity import distro_logo
 from .profiles import PROFILES, TESTS, TestSpec
 
 
@@ -116,6 +118,18 @@ class CertificationRunner:
         test_ids = self.options.selected_tests or self.profile.tests
         return [TESTS[test_id] for test_id in test_ids]
 
+    def render_logo(self) -> None:
+        logo = distro_logo()
+        if logo is None:
+            return
+        if logo.ansi:
+            self.console.print(Text.from_ansi(logo.text))
+            return
+        if logo.alma_fallback:
+            self.console.print(almalinux_logo_text(logo.text))
+            return
+        self.console.print(logo.text)
+
     def render_plan(self, tests: list[TestSpec]) -> None:
         table = Table(title="Planned certification steps")
         table.add_column("#", justify="right")
@@ -126,6 +140,7 @@ class CertificationRunner:
         for index, test in enumerate(tests, start=1):
             table.add_row(f"{index:03d}", test.display_name, test.tag, self.profile.name)
 
+        self.render_logo()
         self.console.print(
             Panel(
                 f"[bold]Profile:[/bold] {self.profile.name}\n"
@@ -455,6 +470,30 @@ class CertificationRunner:
             )
         )
         return overall_exit
+
+
+def almalinux_logo_text(logo: str) -> Text:
+    lines = logo.splitlines()
+    width = max((len(line) for line in lines), default=1)
+    rendered = Text()
+    for y, line in enumerate(lines):
+        for x, character in enumerate(line):
+            if character == " ":
+                rendered.append(character)
+                continue
+            if y < len(lines) * 0.42 and x < width * 0.45:
+                style = "bold red"
+            elif y < len(lines) * 0.42:
+                style = "bold yellow"
+            elif x < width * 0.34:
+                style = "bold blue"
+            elif x < width * 0.67:
+                style = "bold cyan"
+            else:
+                style = "bold green"
+            rendered.append(character, style=style)
+        rendered.append("\n")
+    return rendered
 
 
 def render_profiles(console: Console) -> None:
