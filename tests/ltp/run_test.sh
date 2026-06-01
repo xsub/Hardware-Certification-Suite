@@ -1,6 +1,7 @@
 #!/bin/bash
 
-FULL_LOG=/root/full-ltp.log
+FULL_LOG=${2-"/tmp/full-ltp.log"}
+mkdir -p "$(dirname "$FULL_LOG")"
 
 # Run LTP tests
 echo "LTP tests started"
@@ -24,4 +25,3 @@ cat `find /opt/ltp/results -name '*log'`
 
 echo "Full log with ltp tests results can be found on SUT here: $FULL_LOG and /opt/ltp/results"
 echo "success"
-

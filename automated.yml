@@ -11,15 +11,29 @@
   tasks:
 
     # GENERAL SETUP
-    - name: Create logs dir
+    - name: Create LTS logs dir
       tags: [logs_folder, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits]
       block:
-        - name: Create logs dir
+        - name: Create LTS logs dir
           ansible.builtin.file:
             path: "{{ lts_logs_dir }}"
             state: "directory"
             mode: "0755"
           delegate_to: localhost
+
+    - name: Create SUT work dirs
+      tags: [logs_folder, tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits]
+      block:
+        - name: Create SUT work dirs
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: "directory"
+            mode: "0755"
+          loop:
+            - "{{ hcs_work_dir }}"
+            - "{{ hcs_scratch_dir }}"
+            - "{{ hcs_cache_dir }}"
+            - "{{ hcs_artifacts_dir }}"
 
     - name: Copy tests
       tags: [tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, cllimits]
@@ -28,7 +42,8 @@
           ansible.builtin.copy:
             src: "{{ lts_tests_dir }}/"
             dest: "{{ sut_tests_dir }}"
-            mode: "0777"
+            mode: "0755"
+            directory_mode: "0755"
 
     ##########
 

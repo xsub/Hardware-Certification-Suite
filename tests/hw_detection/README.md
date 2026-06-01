@@ -103,5 +103,5 @@ It runs specific commands and show information about:
  - SCSI Devices;
  - Block Devices (with information HDD/SDD);
 
-Report is stored in: `logs/hw_detection.log`
+Report is stored in `hw_detection.log` under the active run logs directory.
 It contains color highlighting, so better to use `cat` to read it.

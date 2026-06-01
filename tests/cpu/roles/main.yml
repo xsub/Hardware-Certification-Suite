@@ -11,8 +11,18 @@
     state: latest
     enablerepo: epel
 
+- name: Test CPU - create scratch dir
+  ansible.builtin.file:
+    path: "{{ test_cpu['scratch_dir'] }}"
+    state: directory
+    mode: "0755"
+
 - name: Test CPU - run test
-  shell: "{{ sut_tests_dir }}/cpu/run_test.sh {{ test_cpu['duration'] }}"
+  shell: >
+    {{ sut_tests_dir }}/cpu/run_test.sh
+    {{ test_cpu['duration'] | quote }}
+    {{ test_cpu['log_file'] | quote }}
+    {{ test_cpu['scratch_dir'] | quote }}
   register: output
 
 - name: Test CPU - copy log

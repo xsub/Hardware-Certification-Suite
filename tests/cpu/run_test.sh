@@ -2,20 +2,29 @@
 
 TIMEOUT=${1-"4h"}
 LOG_FILE=${2-"cpu_testing.log"}
+TEMP_PATH=${3-""}
 
 function log() {
-  echo "[$(date)] $1" >>$LOG_FILE
+  echo "[$(date)] $1" >>"$LOG_FILE"
 }
 
-if [ -z $(which stress-ng 2>/dev/null) ]; then
+mkdir -p "$(dirname "$LOG_FILE")"
+
+if ! command -v stress-ng >/dev/null 2>&1; then
   log "stress-ng not installed"
   exit 1
 fi
 
 log "Run CPU stress test... ${TIMEOUT}"
 
+STRESS_ARGS=(--cpu 0 --cpu-method all -t "$TIMEOUT" --metrics --verbose)
+if [ -n "$TEMP_PATH" ]; then
+  mkdir -p "$TEMP_PATH"
+  STRESS_ARGS+=(--temp-path "$TEMP_PATH")
+fi
+
 # TODO: Can't pass output to var
-stress-ng --cpu 0 --cpu-method all -t $TIMEOUT --metrics --verbose &>>$LOG_FILE 2>&1
+stress-ng "${STRESS_ARGS[@]}" &>>"$LOG_FILE" 2>&1
 
 CODE=$?
 
@@ -34,7 +43,7 @@ if (($CODE != 0)); then
   log "Test FAILED!"
 fi
 
-cat $LOG_FILE
-rm -f $LOG_FILE
+cat "$LOG_FILE"
+rm -f "$LOG_FILE"
 
 exit $CODE

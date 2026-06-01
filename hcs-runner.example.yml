@@ -1,0 +1,22 @@
+run:
+  # Generated sandboxes are created as:
+  # /tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
+  base_dir: /tmp
+  # Optional stable run id. Leave empty to generate one.
+  id:
+  # Optional explicit sandbox root for this run.
+  sandbox_dir:
+
+paths:
+  # All paths below are relative to the sandbox root and must stay inside it.
+  runner_dir: runner
+  logs_dir: logs
+  scratch_dir: scratch
+  cache_dir: cache
+  artifacts_dir: artifacts
+  sut_tests_dir: sut-tests
+  phoronix_dir: phoronix
+  ltp_dir: ltp
+
+ansible:
+  extra_vars: {}

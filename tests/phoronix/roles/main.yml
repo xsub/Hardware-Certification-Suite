@@ -19,6 +19,12 @@
     value: 1000000
     state: present
 
+- name: Phoronix - create work dir
+  ansible.builtin.file:
+    path: "{{ test_phoronix['folder'] }}"
+    state: directory
+    mode: "0755"
+
 - name: Phoronix - df
   shell: "df -BG --output=avail {{ test_phoronix['folder'] }} | grep -o '[0-9]*'"
   register: df_output
@@ -68,7 +74,7 @@
       copy:
         src: "{{ lts_tests_dir }}/phoronix/sources/phoronix-test-suite.xml"
         dest: "/etc/phoronix-test-suite.xml"
-        mode: "0777"
+        mode: "0644"
 
     - name: Phoronix - set folder path
       replace:
@@ -79,7 +85,7 @@
     # Test
     - name: Phoronix - install & run tests
       shell: "phoronix-test-suite batch-benchmark {{ test_phoronix['tests'][ansible_facts['distribution_major_version'] | int] | join(' ') }} |
-        tee /root/phoronix.tee.log"
+        tee {{ (hcs_scratch_dir + '/phoronix.tee.log') | quote }}"
       environment:
         FORCE_TIMES_TO_RUN: 1
       register: output
