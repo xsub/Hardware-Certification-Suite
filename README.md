@@ -31,6 +31,56 @@ Override the base directory with `work_dir`:
 ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "work_dir=/mnt/certification"
 ```
 
+# Rich CLI runner
+The Python runner wraps the Ansible suite with a Rich console UI, predefined
+test-length profiles, repeatable passes, and consistent per-run artifacts.
+
+Install it in the same virtual environment as Ansible:
+
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+pip install ansible
+pip install -r requirements-runner.txt
+```
+
+Inspect the built-in profiles and test registry:
+
+```bash
+python -m hcs profiles
+python -m hcs tests
+```
+
+Run a local sanity pass:
+
+```bash
+python -m hcs run --profile check --inventory 127.0.0.1, -c local
+```
+
+Preview a longer plan without running Ansible:
+
+```bash
+python -m hcs run --profile medium --repeat 3 --dry-run
+```
+
+Available profiles are `check`, `short`, `medium`, `long`, `very_long`, and
+`extreme`. Use `--test <id>` to run one or more specific tests and
+`--extra-var KEY=VALUE` to pass Ansible variables such as
+`cpu_duration=20m` or `work_dir=/mnt/certification`.
+
+Each run writes a timestamped directory under
+`/var/tmp/almalinux-certification/runs/` by default. The runner records:
+
+- `config.requested.json` - requested profile, inventory, repeat count, and variables
+- `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log` - streamed command output
+- `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` - structured step result
+- `run.summary.json` - machine-readable run summary
+- `run.report.txt` - plain-text engineering report with timestamps and runner version
+
+Ansible recap lines are parsed, so a task reported as `ignored=1`,
+`failed>0`, or `unreachable>0` is treated as a failed runner step even when
+Ansible exits with status `0`.
+
 # Suggested Run
 
 ## Local Run
