@@ -200,7 +200,7 @@ if [ "$global_result" == "true" ]; then
     sut_command 'service firewalld start > /dev/null 2>&1 &'
 fi
 
-info "For more information see: logs/network.log"
+info "For more information see the network.log file in the run logs directory."
 
 if [ "$global_result" == "true" ]; then
     success 'Test status: SUCCESS!'

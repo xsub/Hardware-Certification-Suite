@@ -18,6 +18,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn
 from rich.table import Table
 
 from . import __version__
+from .config import SandboxPaths
 from .profiles import PROFILES, TESTS, TestSpec
 
 
@@ -39,8 +40,7 @@ class RunnerOptions:
     inventory: str
     connection: str | None
     playbook: Path
-    work_dir: Path
-    run_dir: Path | None
+    paths: SandboxPaths
     extra_vars: dict[str, str]
     selected_tests: tuple[str, ...] | None
     repeat: int
@@ -68,10 +68,6 @@ class StepResult:
 
 def utc_timestamp() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def run_id(profile: str) -> str:
-    return datetime.now(UTC).strftime(f"%Y%m%dT%H%M%SZ-{profile}")
 
 
 def parse_extra_vars(values: list[str]) -> dict[str, str]:
@@ -113,7 +109,8 @@ class CertificationRunner:
         self.options = options
         self.console = console or Console()
         self.profile = PROFILES[options.profile]
-        self.run_dir = options.run_dir or options.work_dir / "runs" / run_id(options.profile)
+        self.paths = options.paths
+        self.run_dir = self.paths.runner_dir
 
     def selected_tests(self) -> list[TestSpec]:
         test_ids = self.options.selected_tests or self.profile.tests
@@ -133,7 +130,9 @@ class CertificationRunner:
             Panel(
                 f"[bold]Profile:[/bold] {self.profile.name}\n"
                 f"[bold]Mode:[/bold] {self.profile.description}\n"
-                f"[bold]Run dir:[/bold] {self.run_dir}\n"
+                f"[bold]Run ID:[/bold] {self.paths.run_id}\n"
+                f"[bold]Sandbox:[/bold] {self.paths.sandbox_dir}\n"
+                f"[bold]Runner artifacts:[/bold] {self.run_dir}\n"
                 f"[bold]Inventory:[/bold] {self.options.inventory}",
                 title="AlmaLinux Hardware Certification Suite",
             )
@@ -159,12 +158,33 @@ class CertificationRunner:
 
         extra_vars = dict(self.profile.extra_vars)
         extra_vars.update(self.options.extra_vars)
-        extra_vars.setdefault("work_dir", str(self.options.work_dir))
-        command.extend(["--extra-vars", json.dumps(extra_vars)])
+        sandbox_extra_vars = {
+            "hcs_run_id": self.paths.run_id,
+            "hcs_run_timestamp": self.paths.timestamp,
+            "sandbox_dir": str(self.paths.sandbox_dir),
+            "work_dir": str(self.paths.sandbox_dir),
+            "scratch_dir": str(self.paths.scratch_dir),
+            "cache_dir": str(self.paths.cache_dir),
+            "artifacts_dir": str(self.paths.artifacts_dir),
+            "unique_logs_folder": str(self.paths.logs_dir),
+            "tests_dir": str(self.paths.sut_tests_dir),
+            "phoronix_folder": str(self.paths.phoronix_dir),
+            "ltp_clone_path": str(self.paths.ltp_dir),
+        }
+        sandbox_extra_vars.update(extra_vars)
+        command.extend(["--extra-vars", json.dumps(sandbox_extra_vars)])
         return command
 
     def prepare_run_dir(self) -> None:
-        self.run_dir.mkdir(parents=True, exist_ok=True)
+        for directory in (
+            self.paths.sandbox_dir,
+            self.paths.runner_dir,
+            self.paths.logs_dir,
+            self.paths.scratch_dir,
+            self.paths.cache_dir,
+            self.paths.artifacts_dir,
+        ):
+            directory.mkdir(parents=True, exist_ok=True)
         (self.run_dir / "tests").mkdir(exist_ok=True)
 
     def write_requested_config(self, tests: list[TestSpec]) -> None:
@@ -175,8 +195,7 @@ class CertificationRunner:
             "inventory": self.options.inventory,
             "connection": self.options.connection,
             "playbook": str(self.options.playbook),
-            "work_dir": str(self.options.work_dir),
-            "run_dir": str(self.run_dir),
+            "paths": self.paths.as_dict(),
             "dry_run": self.options.dry_run,
             "stop_on_failure": self.options.stop_on_failure,
             "extra_vars": self.options.extra_vars,
@@ -222,7 +241,7 @@ class CertificationRunner:
             "status": status,
             "started_at": started_at,
             "finished_at": finished_at,
-            "run_dir": str(self.run_dir),
+            "paths": self.paths.as_dict(),
             "results": [
                 {
                     "step": result.step,
@@ -254,7 +273,9 @@ class CertificationRunner:
         lines = [
             "AlmaLinux Hardware Certification Suite",
             "",
-            f"Run directory: {self.run_dir}",
+            f"Run ID: {self.paths.run_id}",
+            f"Sandbox directory: {self.paths.sandbox_dir}",
+            f"Runner directory: {self.run_dir}",
             f"Profile: {self.profile.name}",
             f"Status: {status}",
             f"Started: {started_at}",
@@ -426,7 +447,13 @@ class CertificationRunner:
 
         finished_at = utc_timestamp()
         self.write_summary(results, started_at, finished_at)
-        self.console.print(Panel(f"Run artifacts written to:\n[bold]{self.run_dir}[/bold]", title="Run complete"))
+        self.console.print(
+            Panel(
+                f"Sandbox:\n[bold]{self.paths.sandbox_dir}[/bold]\n\n"
+                f"Runner artifacts:\n[bold]{self.run_dir}[/bold]",
+                title="Run complete",
+            )
+        )
         return overall_exit
 
 

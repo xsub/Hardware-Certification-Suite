@@ -15,20 +15,29 @@ This repo is the home of the AlmaLinux Certification Suite.  We largely rely on 
 - \>= 300GB disk space, preferably SSD/NVMe
 
 # Working directories
-By default, the suite stores working data under `/var/tmp/almalinux-certification`
-instead of `/root`. The main directories are:
+Each certification run should own one sandbox directory. When the Rich runner is
+used, the default sandbox is generated as:
 
-- `hcs_work_dir` - suite work directory, defaults to `/var/tmp/almalinux-certification`
-- `hcs_scratch_dir` - temporary files and tool scratch data
-- `hcs_cache_dir` - reserved for cached downloads and reusable assets
-- `hcs_artifacts_dir` - reserved for structured test artifacts
-- `lts_logs_dir` - timestamped logs copied to the LTS
-- `sut_tests_dir` - copied test scripts on the SUT
+```text
+/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
+```
 
-Override the base directory with `work_dir`:
+Everything created by HCS for that run is placed under the sandbox:
+
+- `runner/` - runner JSON, plain-text reports, and per-step console logs
+- `logs/` - test logs copied back to the LTS
+- `scratch/` - temporary tool output
+- `cache/` - reusable downloads and local caches
+- `artifacts/` - structured test artifacts
+- `sut-tests/` - copied test scripts on the SUT
+- `phoronix/` - Phoronix installation and result data
+- `ltp/` - Linux Test Project checkout and build data
+
+When running Ansible directly, the same sandbox model is used through
+`vars.yml`. Override the sandbox explicitly with `sandbox_dir`:
 
 ```bash
-ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "work_dir=/mnt/certification"
+ansible-playbook -c local -i 127.0.0.1, automated.yml --extra-vars "sandbox_dir=/mnt/certification/run-001"
 ```
 
 # Rich CLI runner
@@ -66,10 +75,23 @@ python -m hcs run --profile medium --repeat 3 --dry-run
 Available profiles are `check`, `short`, `medium`, `long`, `very_long`, and
 `extreme`. Use `--test <id>` to run one or more specific tests and
 `--extra-var KEY=VALUE` to pass Ansible variables such as
-`cpu_duration=20m` or `work_dir=/mnt/certification`.
+`cpu_duration=20m`.
 
-Each run writes a timestamped directory under
-`/var/tmp/almalinux-certification/runs/` by default. The runner records:
+Use `--base-dir`, `--sandbox-dir`, or `--run-id` to control the sandbox:
+
+```bash
+python -m hcs run --profile check --base-dir /var/tmp
+python -m hcs run --profile check --sandbox-dir /mnt/certification/AlmaLinux-HCS-lab-run-001
+python -m hcs run --profile check --run-id lab-run-001
+```
+
+The same values can be stored in YAML. See `hcs-runner.example.yml`:
+
+```bash
+python -m hcs run --config hcs-runner.example.yml --profile check
+```
+
+Each run writes runner files under `<sandbox>/runner/`:
 
 - `config.requested.json` - requested profile, inventory, repeat count, and variables
 - `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log` - streamed command output
@@ -210,7 +232,7 @@ Create your test directory in the `~/Hardware-Certification-Suite/tests` folder,
 |-- stepx.yml - sub playbook with interactive prompts  
 |-- README.md - instructions for working with the test when manually launched
 
-Each automated test should store test results and utility output in a file `name`.log in the root directory of the repository `~/Hardware-Certification-Suite/logs/`. You can get the folder path from a variable `{{ lts_logs_dir }}`.
+Each automated test should store test results and utility output in `{{ lts_logs_dir }}/name.log`. That path is inside the active run sandbox.
 
 Add your automated tasks that perform the test to the `~/Hardware-Certification-Suite/automated.yml` file and interactive playbook to the `~/Hardware-Certification-Suite/interactive.yml` file located in the root of the repository.
 
@@ -244,7 +266,11 @@ Tests can be configured via `~/Hardware-Certification-Suite/vars.yml` file.
 * lts_logs_dir - LTS logs folder
 * sut_ip - SUT IP address
 * sut_tests_dir - SUT logs folder
-* hcs_work_dir - Suite work directory. Defaults to `/var/tmp/almalinux-certification`
+* hcs_run_id - Run identifier used in the generated sandbox name
+* hcs_run_timestamp - UTC timestamp used in the generated sandbox name
+* hcs_base_dir - Base directory for generated sandboxes. Defaults to `/tmp`
+* hcs_sandbox_dir - Run sandbox root. Defaults to `/tmp/AlmaLinux-HCS-<timestamp>-RunID-<id>`
+* hcs_work_dir - Suite work directory. Defaults to `hcs_sandbox_dir`
 * hcs_scratch_dir - Scratch directory for temporary tool output
 * hcs_cache_dir - Cache directory for future reusable downloads/assets
 * hcs_artifacts_dir - Directory reserved for structured artifacts
@@ -301,7 +327,7 @@ TIPS
 * Before starting testing, you need to request information about the hardware. For example, it is not necessary to run a RAID test everywhere.
 * Notify in advance of the need to prepare the number of devices equal to the number of USB ports on the server to run the USB test.
 * Testing can be delayed, it is recommended to use the screen utility. For example `screen -L -S hctest`
-* For phoronix test, you need more than 100 gigabytes of space. By default it stores test data under the suite work directory. To change the location, override `work_dir` or `test_phoronix['folder']`.
+* For phoronix test, you need more than 100 gigabytes of space. By default it stores test data under the run sandbox. To change the location while keeping data sandboxed, use the runner config `paths.phoronix_dir` or override `sandbox_dir`.
 
 ---
 This repo is managed by the [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification)

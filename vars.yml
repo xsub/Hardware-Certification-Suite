@@ -2,15 +2,19 @@
 
 # GENERAL
 _ssh_connection: "{{ hostvars[inventory_hostname]['ansible_env'].SSH_CONNECTION }}"
-hcs_work_dir: "{{ work_dir|default('/var/tmp/almalinux-certification') }}"
+hcs_run_id: "{{ run_id|default(ansible_date_time.epoch) }}"
+hcs_run_timestamp: "{{ run_timestamp|default(ansible_date_time.iso8601_basic_short) }}"
+hcs_base_dir: "{{ base_dir|default('/tmp') }}"
+hcs_sandbox_dir: "{{ sandbox_dir|default(hcs_base_dir + '/AlmaLinux-HCS-' + hcs_run_timestamp + '-RunID-' + hcs_run_id) }}"
+hcs_work_dir: "{{ work_dir|default(hcs_sandbox_dir) }}"
 hcs_scratch_dir: "{{ scratch_dir|default(hcs_work_dir + '/scratch') }}"
 hcs_cache_dir: "{{ cache_dir|default(hcs_work_dir + '/cache') }}"
 hcs_artifacts_dir: "{{ artifacts_dir|default(hcs_work_dir + '/artifacts') }}"
 lts_ip: "{{ _ssh_connection.split(' ')[0] }}"
 lts_tests_dir: "./tests"
-lts_logs_dir: "{{ unique_logs_folder|default(hcs_work_dir + '/logs/' + ansible_date_time.iso8601) }}"
+lts_logs_dir: "{{ unique_logs_folder|default(logs_dir|default(hcs_work_dir + '/logs')) }}"
 sut_ip: "{{ _ssh_connection.split(' ')[2] }}"
-sut_tests_dir: "{{ tests_dir|default(hcs_work_dir + '/tests') }}"
+sut_tests_dir: "{{ tests_dir|default(hcs_work_dir + '/sut-tests') }}"
 
 # CPU
 test_cpu:
@@ -70,7 +74,7 @@ test_phoronix:
 
 # LTP
 # Path to clone LTP project to SUT
-ltp_clone_path: "{{ hcs_work_dir }}/ltp"
+ltp_clone_path: "{{ ltp_dir|default(hcs_work_dir + '/ltp') }}"
 test_ltp:
   suites: "{{ ltp_suites|default('all') }}"
   log_file: "{{ ltp_log_file|default(hcs_scratch_dir + '/ltp-full.log') }}"
