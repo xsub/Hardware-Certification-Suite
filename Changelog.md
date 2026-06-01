@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-01 - AlmaLinux native NVIDIA guidance
+
+- Added AlmaLinux 9/10 native NVIDIA package guidance to the GPU Burn workflow.
+- When `gpu_burn` runs on AlmaLinux 9/10 without `nvidia-smi`, the unsupported
+  reason now points operators at `almalinux-release-nvidia-driver`,
+  `nvidia-open-kmod`, `nvidia-driver`, and `nvidia-driver-cuda`.
+- Documented the native driver preparation commands in README and the GPU Burn
+  test README.
+- Updated the development plan so future NVIDIA driver validation/install
+  work uses AlmaLinux's native package path first, while keeping automatic
+  driver installation behind an explicit operator-controlled flag.
+
 ## 2026-06-01 - built-in system identity header
 
 - Added a built-in neofetch-style runner header for AlmaLinux controllers.

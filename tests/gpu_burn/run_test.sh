@@ -71,6 +71,27 @@ function unsupported() {
   exit 0
 }
 
+function almalinux_nvidia_hint() {
+  local os_id=""
+  local version_id=""
+  local major=""
+
+  if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_id=${ID:-}
+    version_id=${VERSION_ID:-}
+    major=${version_id%%.*}
+  fi
+
+  if [ "$os_id" = "almalinux" ] && { [ "$major" = "9" ] || [ "$major" = "10" ]; }; then
+    printf '%s' "AlmaLinux ${version_id} has native NVIDIA packages: dnf install almalinux-release-nvidia-driver; dnf install nvidia-open-kmod nvidia-driver nvidia-driver-cuda; reboot or modprobe nvidia_drm; rerun gpu_burn"
+    return
+  fi
+
+  printf '%s' "install NVIDIA drivers/runtime and confirm nvidia-smi before rerunning gpu_burn"
+}
+
 function fail() {
   local reason=$1
   local rc=${2:-1}
@@ -107,11 +128,11 @@ function start_telemetry() {
 
 function ensure_nvidia_driver() {
   if ! command -v nvidia-smi >/dev/null 2>&1; then
-    unsupported "nvidia-smi not found; NVIDIA driver/runtime is not installed"
+    unsupported "nvidia-smi not found; NVIDIA driver/runtime is not installed; $(almalinux_nvidia_hint)"
   fi
 
   if ! nvidia-smi -L >>"$LOG_FILE" 2>&1; then
-    unsupported "nvidia-smi cannot list GPUs; NVIDIA driver/runtime is not ready"
+    unsupported "nvidia-smi cannot list GPUs; NVIDIA driver/runtime is not ready; $(almalinux_nvidia_hint)"
   fi
 
   if ! nvidia-smi --query-gpu=index,name,uuid,driver_version --format=csv,noheader >>"$LOG_FILE" 2>&1; then

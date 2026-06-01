@@ -594,18 +594,26 @@ Driver installation must be careful:
 
 - default to detect/report mode
 - require an explicit config flag before installing vendor drivers
+- on AlmaLinux 9 and 10, prefer the native AlmaLinux NVIDIA package path:
+  `almalinux-release-nvidia-driver`, `nvidia-open-kmod`, `nvidia-driver`, and
+  `nvidia-driver-cuda`
 - support offline/local repository paths
 - record every repository and package installed
 - detect Secure Boot and DKMS/kernel-devel prerequisites before modifying the
   system
 - produce a clear warning when driver installation would make the system
   non-compliant with the operator's policy
+- leave room for a future `nvidia_driver` test that can validate or optionally
+  prepare this native package stack before CUDA/GPU Burn workloads run
 
 Baseline `gpu_burn` workload design:
 
 - do not install NVIDIA drivers implicitly in the first implementation
 - check `nvidia-smi` first and report `unsupported` when NVIDIA drivers or GPUs
   are not available
+- when running on AlmaLinux 9/10 without `nvidia-smi`, print the native
+  AlmaLinux NVIDIA setup hint so the operator can fix the host without leaving
+  the HCS workflow
 - use a configured/prebuilt `gpu_burn` binary when present
 - otherwise clone/build GPU Burn into the run cache when `git`, `make`, and
   `nvcc` are available

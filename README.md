@@ -294,6 +294,23 @@ NVIDIA drivers are not installed.
 python -m hcs run --profile check --test gpu_burn --inventory 127.0.0.1, -c local
 ```
 
+On AlmaLinux 9 and 10, NVIDIA driver setup is now an AlmaLinux-native package
+flow with Secure Boot-capable open GPU kernel module support. Prepare a
+machine for `gpu_burn` with:
+
+```bash
+dnf install almalinux-release-nvidia-driver
+dnf install nvidia-open-kmod nvidia-driver nvidia-driver-cuda
+reboot
+nvidia-smi
+```
+
+The full AlmaLinux instructions are maintained in the
+[NVIDIA driver documentation](https://wiki.almalinux.org/documentation/nvidia.html).
+HCS does not install these drivers automatically today; it detects the driver
+state, records `unsupported` when `nvidia-smi` is missing, and points the
+operator at the native AlmaLinux setup path.
+
 Use Ansible directly only for low-level debugging or when you intentionally do
 not need runner reports. Direct Ansible runs still use the sandbox defaults in
 `vars.yml`, but they do not create runner JSON summaries, repeated-pass

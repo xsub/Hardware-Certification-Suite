@@ -8,6 +8,20 @@ It runs only when the NVIDIA driver/runtime is already installed and
 `HCS_UNSUPPORTED` marker and the runner records the step as unsupported instead
 of treating the machine as failed.
 
+On AlmaLinux 9 and 10, use the native AlmaLinux NVIDIA packages before running
+this test:
+
+```bash
+dnf install almalinux-release-nvidia-driver
+dnf install nvidia-open-kmod nvidia-driver nvidia-driver-cuda
+reboot
+nvidia-smi
+```
+
+The test does not install drivers automatically. When it sees AlmaLinux 9/10
+without a working `nvidia-smi`, it prints this native setup hint as part of the
+unsupported reason.
+
 Normal runner usage:
 
 ```bash
