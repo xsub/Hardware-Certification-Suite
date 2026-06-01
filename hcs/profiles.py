@@ -33,6 +33,7 @@ TESTS: dict[str, TestSpec] = {
     "raid": TestSpec("raid", "MD RAID", "raid"),
     "ltp": TestSpec("ltp", "Linux Test Project", "ltp"),
     "phoronix": TestSpec("phoronix", "Phoronix", "phoronix"),
+    "gpu_burn": TestSpec("gpu_burn", "GPU Burn", "gpu_burn"),
     "cllimits": TestSpec("cllimits", "CloudLinux limits", "cllimits"),
 }
 

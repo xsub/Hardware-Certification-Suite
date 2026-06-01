@@ -24,7 +24,7 @@ if [ -n "$TEMP_PATH" ]; then
 fi
 
 # TODO: Can't pass output to var
-stress-ng "${STRESS_ARGS[@]}" &>>"$LOG_FILE" 2>&1
+stress-ng "${STRESS_ARGS[@]}" >>"$LOG_FILE" 2>&1
 
 CODE=$?
 

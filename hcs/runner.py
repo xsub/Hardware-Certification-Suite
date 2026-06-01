@@ -34,6 +34,7 @@ RECAP_RE = re.compile(
     r"rescued=(?P<rescued>\d+)\s+"
     r"ignored=(?P<ignored>\d+)"
 )
+UNSUPPORTED_RE = re.compile(r"HCS_UNSUPPORTED:\s*(?P<reason>[^\"}]+)")
 
 
 @dataclass
@@ -104,6 +105,14 @@ def recap_has_failures(recap: dict[str, dict[str, int]]) -> bool:
         or stats.get("ignored", 0) > 0
         for stats in recap.values()
     )
+
+
+def run_status(results: list[StepResult]) -> str:
+    if any(result.status == "failed" for result in results):
+        return "failed"
+    if any(result.status == "unsupported" for result in results):
+        return "passed_with_warnings"
+    return "passed"
 
 
 class CertificationRunner:
@@ -247,7 +256,7 @@ class CertificationRunner:
         result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     def write_summary(self, results: list[StepResult], started_at: str, finished_at: str) -> None:
-        status = "passed" if all(result.status in {"passed", "skipped"} for result in results) else "failed"
+        status = run_status(results)
         summary = {
             "schema_version": 1,
             "runner_version": __version__,
@@ -355,6 +364,7 @@ class CertificationRunner:
             )
 
         ansible_recap: dict[str, dict[str, int]] = {}
+        unsupported_reason: str | None = None
         with console_log.open("w", encoding="utf-8", errors="replace") as handle:
             handle.write(f"$ {shlex.join(command)}\n\n")
             process = subprocess.Popen(
@@ -371,6 +381,9 @@ class CertificationRunner:
                 handle.write(line)
                 stripped = line.strip()
                 if stripped:
+                    unsupported = UNSUPPORTED_RE.search(stripped)
+                    if unsupported and unsupported_reason is None:
+                        unsupported_reason = unsupported.group("reason")
                     recap = parse_recap_line(stripped)
                     if recap:
                         host, stats = recap
@@ -385,6 +398,9 @@ class CertificationRunner:
         if return_code != 0:
             status = "failed"
             status_reason = f"ansible-playbook returned {return_code}"
+        elif unsupported_reason is not None:
+            status = "unsupported"
+            status_reason = unsupported_reason
         elif recap_has_failures(ansible_recap):
             status = "failed"
             status_reason = "ansible recap reported failed, unreachable, or ignored tasks"
@@ -449,6 +465,8 @@ class CertificationRunner:
                         self.console.print(f"[green]PASS[/green] {label}")
                     elif result.status == "skipped":
                         self.console.print(f"[yellow]SKIP[/yellow] {label}")
+                    elif result.status == "unsupported":
+                        self.console.print(f"[yellow]UNSUPPORTED[/yellow] {label} {result.status_reason}")
                     else:
                         overall_exit = result.return_code or 1
                         self.console.print(

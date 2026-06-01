@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-01 - GPU Burn test
+
+- Added an optional `gpu_burn` runner/Ansible test for NVIDIA systems.
+- The test checks for working NVIDIA drivers with `nvidia-smi` before doing any
+  stress work.
+- If NVIDIA drivers or GPUs are not available, the test emits
+  `HCS_UNSUPPORTED` and the runner records the step as `unsupported` instead of
+  marking the machine failed.
+- The test can use a configured/prebuilt `gpu_burn` binary or clone/build the
+  open source GPU Burn workload into the HCS cache when `git`, `make`, and
+  `nvcc` are available.
+- Added GPU Burn logs, NVIDIA telemetry CSV, and JSON result artifacts under
+  the HCS sandbox.
+- Updated the runner summary model so unsupported tests produce a
+  `passed_with_warnings` run status unless another step fails.
+- Updated README and the development plan to position custom CUDA/render
+  workloads as later optional extensions, with GPU Burn as the first pragmatic
+  open source baseline.
+
 ## 2026-06-01 - generic Linux and accelerator roadmap
 
 - Added distro-aware runner logo support.

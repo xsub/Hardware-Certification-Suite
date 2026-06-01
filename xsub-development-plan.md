@@ -512,12 +512,20 @@ workloads on real hardware.
 The first goal is not to replace vendor validation suites. The goal is to make
 AlmaLinux a credible, easy-to-test base layer for GPU-enabled systems.
 
+The first implementation should be based on existing open source tools rather
+than a custom CUDA renderer. [GPU Burn](https://github.com/wilicc/gpu-burn) is a
+strong first move because it is a known, focused NVIDIA CUDA stress workload
+and keeps HCS responsible for orchestration, telemetry, sandboxing, and
+reporting rather than GPU algorithm correctness.
+
 Recommended test IDs:
 
 - `gpu_detection`: detect PCI GPU devices, driver state, kernel modules, IOMMU,
   display/compute role, firmware, and relevant logs
 - `nvidia_driver`: validate NVIDIA driver installation state and collect
   `nvidia-smi` facts
+- `gpu_burn`: run the open source GPU Burn workload when NVIDIA drivers are
+  already installed and `nvidia-smi` can list GPUs
 - `cuda_smoke`: compile and run a tiny CUDA program that exercises memory copy,
   kernel launch, and basic floating-point computation
 - `cuda_burn`: longer CUDA stress workload with temperature, power, clock, ECC,
@@ -548,7 +556,22 @@ Driver installation must be careful:
 - produce a clear warning when driver installation would make the system
   non-compliant with the operator's policy
 
-CUDA workload design:
+Baseline `gpu_burn` workload design:
+
+- do not install NVIDIA drivers implicitly in the first implementation
+- check `nvidia-smi` first and report `unsupported` when NVIDIA drivers or GPUs
+  are not available
+- use a configured/prebuilt `gpu_burn` binary when present
+- otherwise clone/build GPU Burn into the run cache when `git`, `make`, and
+  `nvcc` are available
+- collect `nvidia-smi` telemetry before and during the workload
+- keep the GPU Burn log, build log, telemetry CSV, and result JSON inside the
+  HCS sandbox
+- fail on GPU Burn non-zero exit, Xid/device reset signs, driver/runtime
+  mismatch, thermal shutdown, or telemetry collection errors that invalidate
+  the result
+
+Custom CUDA workload design, later:
 
 - start with a small C/CUDA program built with `nvcc` when available
 - add a Rust/CUDA path only after the C smoke test is stable
@@ -560,8 +583,11 @@ CUDA workload design:
   shutdown, or driver/runtime mismatch
 
 For graphics/VFX GPUs, a visually meaningful workload could render many
-revolving AlmaLinux logo meshes, particles, or shader-heavy scenes. This should
-be treated as a future optional workload:
+revolving AlmaLinux logo meshes, particles, or shader-heavy scenes. This is
+attractive from a demo and product-story perspective, but it creates the
+classic risk of testing bugs in our own workload rather than the system under
+test. It should be treated as a future optional workload, not the first GPU
+certification signal:
 
 - first use proven tools such as Blender benchmark, glmark2, vkmark, or
   Phoronix GPU suites where packages and licensing permit

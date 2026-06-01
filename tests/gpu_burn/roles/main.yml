@@ -1,0 +1,47 @@
+---
+
+- name: GPU Burn - create artifact directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ test_gpu_burn['log_file'] | dirname }}"
+    - "{{ test_gpu_burn['telemetry_file'] | dirname }}"
+    - "{{ test_gpu_burn['result_file'] | dirname }}"
+    - "{{ test_gpu_burn['source_dir'] | dirname }}"
+
+- name: GPU Burn - run test
+  ansible.builtin.shell: "{{ sut_tests_dir }}/gpu_burn/run_test.sh"
+  environment:
+    HCS_GPU_BURN_DURATION: "{{ test_gpu_burn['duration'] }}"
+    HCS_GPU_BURN_MEMORY: "{{ test_gpu_burn['memory'] }}"
+    HCS_GPU_BURN_DEVICES: "{{ test_gpu_burn['devices'] }}"
+    HCS_GPU_BURN_USE_DOUBLES: "{{ test_gpu_burn['use_doubles'] }}"
+    HCS_GPU_BURN_USE_TENSOR_CORES: "{{ test_gpu_burn['use_tensor_cores'] }}"
+    HCS_GPU_BURN_TELEMETRY_INTERVAL: "{{ test_gpu_burn['telemetry_interval'] }}"
+    HCS_GPU_BURN_SOURCE_URL: "{{ test_gpu_burn['source_url'] }}"
+    HCS_GPU_BURN_SOURCE_REF: "{{ test_gpu_burn['source_ref'] }}"
+    HCS_GPU_BURN_SOURCE_DIR: "{{ test_gpu_burn['source_dir'] }}"
+    HCS_GPU_BURN_BINARY: "{{ test_gpu_burn['binary'] }}"
+    HCS_GPU_BURN_BUILD_FROM_SOURCE: "{{ test_gpu_burn['build_from_source'] }}"
+    HCS_GPU_BURN_LOG_FILE: "{{ test_gpu_burn['log_file'] }}"
+    HCS_GPU_BURN_TELEMETRY_FILE: "{{ test_gpu_burn['telemetry_file'] }}"
+    HCS_GPU_BURN_RESULT_FILE: "{{ test_gpu_burn['result_file'] }}"
+  register: output
+
+- name: GPU Burn - collect unsupported marker
+  ansible.builtin.set_fact:
+    hcs_gpu_burn_unsupported: "{{ output.stdout_lines | select('match', '^HCS_UNSUPPORTED:') | list | first | default('') }}"
+
+- name: GPU Burn - report unsupported status to runner
+  ansible.builtin.debug:
+    msg: "{{ hcs_gpu_burn_unsupported }}"
+  when: hcs_gpu_burn_unsupported | length > 0
+
+- name: GPU Burn - copy console log
+  ansible.builtin.copy:
+    content: "{{ output.stdout }}"
+    dest: "{{ lts_logs_dir }}/gpu_burn.log"
+    mode: "0644"
+  delegate_to: localhost

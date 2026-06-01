@@ -145,6 +145,9 @@ pages.
 - Plain-text reports first, with structured JSON next to them.
 - Per-step console logs and result files with consistent names.
 - Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
+- Optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) stress
+  testing when NVIDIA drivers are already installed and `nvidia-smi` can see
+  the GPUs.
 - Coverage for the certification testing areas documented by the official
   program, including automated and interactive checks.
 
@@ -256,6 +259,14 @@ Override an Ansible variable while using the runner:
 python -m hcs run --profile medium --extra-var cpu_duration=20m
 ```
 
+Run the optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) test.
+This test is not part of the default profiles; it records `unsupported` when
+NVIDIA drivers are not installed.
+
+```bash
+python -m hcs run --profile check --test gpu_burn --inventory 127.0.0.1, -c local
+```
+
 Use Ansible directly only for low-level debugging or when you intentionally do
 not need runner reports. Direct Ansible runs still use the sandbox defaults in
 `vars.yml`, but they do not create runner JSON summaries, repeated-pass
@@ -278,6 +289,12 @@ Run several automated tests with Ansible:
 ```bash
 ansible-playbook -c local -i 127.0.0.1, automated.yml \
   --tags hw_detection,cpu,network
+```
+
+Run the optional NVIDIA GPU Burn test directly with Ansible:
+
+```bash
+ansible-playbook -c local -i 127.0.0.1, automated.yml --tags gpu_burn
 ```
 
 Run the default automated Ansible set. This runs the ordinary automated tags
@@ -484,6 +501,7 @@ Automated tests can be selected by Ansible tag.
 | `raid` | MD RAID test. |
 | `ltp` | Linux Test Project suites. |
 | `phoronix` | Phoronix benchmark suites. |
+| `gpu_burn` | Optional NVIDIA GPU Burn stress test. |
 | `cllimits` | CloudLinux LVE/CageFS checks. |
 
 Interactive tests are run through `interactive.yml` and are not split into the
@@ -506,6 +524,7 @@ Ansible entry points as follows:
 | USB port functionality | `interactive.yml` using `tests/usb/`; requires hands-on coordination. |
 | PXE device booting | `interactive.yml` using `tests/pxe/`; requires network/boot coordination. |
 | OS feature benchmarking via PTS | `phoronix` automated tag and runner test. |
+| GPU/AI workload readiness | Optional `gpu_burn` runner/Ansible test for NVIDIA systems with drivers installed. |
 
 The `check`, `short`, `medium`, `long`, `very_long`, and `extreme` runner
 profiles are operational presets. They are not certification types. The
@@ -541,6 +560,13 @@ direct playbook use and advanced tuning.
 | `test_ltp.log_file` | LTP full log path on the SUT. |
 | `test_phoronix.tests` | Phoronix test suite mapping. |
 | `test_phoronix.folder` | Phoronix install/results directory under the sandbox. |
+| `test_gpu_burn.duration` | GPU Burn duration in seconds. |
+| `test_gpu_burn.memory` | GPU memory target passed to `gpu_burn -m`. |
+| `test_gpu_burn.devices` | Optional GPU selection passed to `gpu_burn -i`. |
+| `test_gpu_burn.build_from_source` | Clone/build GPU Burn when no binary exists. |
+| `test_gpu_burn.binary` | Existing or built GPU Burn binary path. |
+| `test_gpu_burn.telemetry_file` | NVIDIA telemetry CSV collected during the run. |
+| `test_gpu_burn.result_file` | GPU Burn JSON result artifact. |
 
 ## Adding Tests
 

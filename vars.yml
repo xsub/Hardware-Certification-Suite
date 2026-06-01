@@ -72,6 +72,24 @@ test_phoronix:
   folder: "{{ phoronix_folder|default(hcs_work_dir + '/phoronix') }}"
   need_space: "{{ phoronix_need_space|default(300) }}"
 
+# GPU Burn
+test_gpu_burn:
+  # GPU Burn runs only when NVIDIA drivers are already installed and nvidia-smi works.
+  duration: "{{ gpu_burn_duration|default('60') }}"
+  memory: "{{ gpu_burn_memory|default('90%') }}"
+  devices: "{{ gpu_burn_devices|default('') }}"
+  use_doubles: "{{ gpu_burn_use_doubles|default(false) }}"
+  use_tensor_cores: "{{ gpu_burn_use_tensor_cores|default(false) }}"
+  telemetry_interval: "{{ gpu_burn_telemetry_interval|default('5') }}"
+  source_url: "{{ gpu_burn_source_url|default('https://github.com/wilicc/gpu-burn.git') }}"
+  source_ref: "{{ gpu_burn_source_ref|default('master') }}"
+  source_dir: "{{ gpu_burn_source_dir|default(hcs_cache_dir + '/gpu-burn') }}"
+  binary: "{{ gpu_burn_binary|default(hcs_cache_dir + '/gpu-burn/gpu_burn') }}"
+  build_from_source: "{{ gpu_burn_build_from_source|default(true) }}"
+  log_file: "{{ gpu_burn_log_file|default(hcs_scratch_dir + '/gpu-burn/gpu-burn.log') }}"
+  telemetry_file: "{{ gpu_burn_telemetry_file|default(hcs_artifacts_dir + '/gpu-burn/gpu-burn.nvidia-smi.csv') }}"
+  result_file: "{{ gpu_burn_result_file|default(hcs_artifacts_dir + '/gpu-burn/gpu-burn.result.json') }}"
+
 # LTP
 # Path to clone LTP project to SUT
 ltp_clone_path: "{{ ltp_dir|default(hcs_work_dir + '/ltp') }}"
