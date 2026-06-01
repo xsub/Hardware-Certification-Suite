@@ -1,20 +1,41 @@
-# AlmaLinux Certification Suite
+# AlmaLinux Hardware Certification Suite
 
 [![CI](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml)
 [![Python 3.11+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 
-The AlmaLinux Certification Suite validates that a hardware or virtualized
-platform can run AlmaLinux workloads reliably. It wraps existing open source
-hardware, stress, benchmark, and platform checks in a consistent runner that
-tracks progress, keeps every run sandboxed, and produces repeatable artifacts.
+The AlmaLinux Hardware Certification Suite is the open source test toolkit used
+by the AlmaLinux Certification SIG to collect hardware compatibility,
+reliability, performance, and stability evidence for AlmaLinux OS.
+
+This suite helps run and package the tests. Official certification status is
+granted through the AlmaLinux Hardware Certification Program after review by
+the Certification SIG; a local passing run does not, by itself, make hardware
+certified.
 
 The preferred entry point is the Python/Rich runner:
 
 ```bash
 python -m hcs run --profile check --inventory 127.0.0.1, -c local
 ```
+
+## Official Program
+
+The public process is documented on the
+[AlmaLinux Hardware Certification](https://almalinux.org/certification/hardware-certification/)
+and
+[Hardware Certification Program](https://almalinux.org/certification/hardware-certification/hardware-certification-program/)
+pages.
+
+| Program item | What it means for this repository |
+| --- | --- |
+| Certification requests | Start through the official program flow or the [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications) repository. |
+| Certification coordination | Work with the [Certification SIG](https://wiki.almalinux.org/sigs/Certification.html), especially for IHV-assisted runs, private/NDA work, or hardware hosted by ALOSF. |
+| Certification types | Results may support IHV-facilitated, ALOSF-facilitated, or community validated certification paths. |
+| Public records | Accepted results and certification status are published through the [Ecosystem Catalog](https://almalinux.org/certification/ecosystem-catalog/), not by this repository alone. |
+| Result submission | After the suite is run, share results through a pull request to [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications). |
+| Lifecycle | Certification is scoped to AlmaLinux major versions; minor versions are expected to carry forward unless the SIG requests another run. |
 
 ## What You Get
 
@@ -24,6 +45,8 @@ python -m hcs run --profile check --inventory 127.0.0.1, -c local
 - Plain-text reports first, with structured JSON next to them.
 - Per-step console logs and result files with consistent names.
 - Ansible recap parsing, so `ignored>0`, `failed>0`, or `unreachable>0` marks the step failed even if Ansible exits `0`.
+- Coverage for the certification testing areas documented by the official
+  program, including automated and interactive checks.
 - CI badges for repository checks, Python runner smoke tests, Ansible syntax checks, and AlmaLinux container smoke tests.
 
 ## Requirements
@@ -227,8 +250,9 @@ Run a profile against the remote SUT:
 python -m hcs run --profile check --inventory <SUT IP>,
 ```
 
-Long certification runs can last many hours. Use `tmux` or `screen` on the
-LTS so the session survives network interruptions.
+Full certification runs can take 2 to 5 days depending on the device resources.
+Use `tmux` or `screen` on the LTS so the session survives network
+interruptions.
 
 ## Direct Ansible Usage
 
@@ -271,6 +295,29 @@ Automated tests can be selected by Ansible tag.
 
 Interactive tests are run through `interactive.yml` and are not split into the
 same per-test runner profiles yet.
+
+## Certification Areas
+
+The official Hardware Certification Program describes the broad testing areas
+the suite should cover. In this repository they map to the current runner and
+Ansible entry points as follows:
+
+| Official testing area | Current suite entry point |
+| --- | --- |
+| Hardware detection | `hw_detection` automated tag and runner test. |
+| CPU stress testing | `cpu` automated tag and runner test. |
+| Containerization | `containers` automated tag and runner test. |
+| KVM functionality | `kvm` automated tag and runner test. |
+| Network performance | `network` automated tag and runner test. |
+| Linux kernel testing through LTP | `ltp` automated tag and runner test. |
+| USB port functionality | `interactive.yml` using `tests/usb/`; requires hands-on coordination. |
+| PXE device booting | `interactive.yml` using `tests/pxe/`; requires network/boot coordination. |
+| OS feature benchmarking via PTS | `phoronix` automated tag and runner test. |
+
+The `check`, `short`, `medium`, `long`, `very_long`, and `extreme` runner
+profiles are operational presets. They are not certification types. The
+official certification type and final catalog status are determined through the
+SIG process.
 
 ## Configuration Variables
 
@@ -343,7 +390,9 @@ Guidelines for new automated tests:
   the target platform has the expected devices.
 - Phoronix can require more than `100GB` of free space. Keep its folder inside
   the run sandbox by setting `paths.phoronix_dir` or `sandbox_dir`.
-- Results should be submitted to the
+- Passing local results should be treated as evidence for SIG review, not as a
+  self-issued certification.
+- Results intended for public certification should be submitted to the
   [AlmaLinux certifications repository](https://github.com/AlmaLinux/certifications).
 
 This repository is managed by the
