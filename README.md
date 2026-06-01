@@ -32,13 +32,17 @@ used, the default sandbox is generated as:
 Everything created by HCS for that run is placed under the sandbox:
 
 - `runner/` - runner JSON, plain-text reports, and per-step console logs
-- `logs/` - test logs copied back to the LTS
+- `logs/` - normalized test logs collected in the run sandbox
 - `scratch/` - temporary tool output
 - `cache/` - reusable downloads and local caches
 - `artifacts/` - structured test artifacts
 - `sut-tests/` - copied test scripts on the SUT
 - `phoronix/` - Phoronix installation and result data
 - `ltp/` - Linux Test Project checkout and build data
+
+For remote LTS/SUT runs, Ansible still transfers command output from the SUT
+into the LTS/controller sandbox so results survive SUT cleanup. For local runs,
+the same path is used directly; no extra copy step is needed.
 
 When running Ansible directly, the same sandbox model is used through
 `vars.yml`. Override the sandbox explicitly with `sandbox_dir`:
