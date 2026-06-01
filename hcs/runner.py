@@ -41,6 +41,7 @@ UNSUPPORTED_RE = re.compile(r"HCS_UNSUPPORTED:\s*(?P<reason>[^\"}]+)")
 
 @dataclass
 class RunnerOptions:
+    preset_name: str | None
     profile: str
     inventory: str
     connection: str | None
@@ -50,6 +51,7 @@ class RunnerOptions:
     selected_tests: tuple[str, ...] | None
     test_profiles: dict[str, str]
     test_extra_vars: dict[str, dict[str, str]]
+    test_scopes: dict[str, str]
     repeat: int
     dry_run: bool
     stop_on_failure: bool
@@ -152,14 +154,18 @@ class CertificationRunner:
         table.add_column("Test")
         table.add_column("Tag")
         table.add_column("Profile")
+        table.add_column("Scope")
 
         for index, test in enumerate(tests, start=1):
             step_profile = self.options.test_profiles.get(test.test_id, self.profile.name)
-            table.add_row(f"{index:03d}", test.display_name, test.tag, step_profile)
+            scope = self.options.test_scopes.get(test.test_id, "profile")
+            table.add_row(f"{index:03d}", test.display_name, test.tag, step_profile, scope)
 
         self.render_identity_header()
+        preset_line = f"[bold]Preset:[/bold] {self.options.preset_name}\n" if self.options.preset_name else ""
         self.console.print(
             Panel(
+                preset_line +
                 f"[bold]Profile:[/bold] {self.profile.name}\n"
                 f"[bold]Mode:[/bold] {self.profile.description}\n"
                 f"[bold]Run ID:[/bold] {self.paths.run_id}\n"
@@ -227,6 +233,7 @@ class CertificationRunner:
         requested = {
             "schema_version": 1,
             "runner_version": __version__,
+            "preset": self.options.preset_name,
             "profile": self.profile.name,
             "inventory": self.options.inventory,
             "connection": self.options.connection,
@@ -237,6 +244,7 @@ class CertificationRunner:
             "extra_vars": self.options.extra_vars,
             "test_profiles": self.options.test_profiles,
             "test_extra_vars": self.options.test_extra_vars,
+            "test_scopes": self.options.test_scopes,
             "tests": [test.test_id for test in tests],
             "repeat": self.options.repeat,
             "controller_system": system_summary_payload(self.system_summary),
@@ -257,7 +265,9 @@ class CertificationRunner:
             "pass_count": result.pass_count,
             "test_id": result.test_id,
             "display_name": result.display_name,
+            "preset": self.options.preset_name,
             "profile": self.profile.name,
+            "scope": self.options.test_scopes.get(result.test_id, "profile"),
             "status": result.status,
             "status_reason": result.status_reason,
             "return_code": result.return_code,
@@ -275,6 +285,7 @@ class CertificationRunner:
         summary = {
             "schema_version": 1,
             "runner_version": __version__,
+            "preset": self.options.preset_name,
             "profile": self.profile.name,
             "repeat": self.options.repeat,
             "status": status,
@@ -287,6 +298,7 @@ class CertificationRunner:
                     "step": result.step,
                     "pass_index": result.pass_index,
                     "test_id": result.test_id,
+                    "scope": self.options.test_scopes.get(result.test_id, "profile"),
                     "status": result.status,
                     "status_reason": result.status_reason,
                     "return_code": result.return_code,
@@ -316,6 +328,7 @@ class CertificationRunner:
             f"Run ID: {self.paths.run_id}",
             f"Sandbox directory: {self.paths.sandbox_dir}",
             f"Runner directory: {self.run_dir}",
+            f"Preset: {self.options.preset_name or 'none'}",
             f"Profile: {self.profile.name}",
             f"Status: {status}",
             f"Started: {started_at}",
@@ -333,9 +346,10 @@ class CertificationRunner:
             ]
         )
         for result in results:
+            scope = self.options.test_scopes.get(result.test_id, "profile")
             lines.append(
                 f"  {result.step:03d} pass={result.pass_index:02d}/{result.pass_count:02d} "
-                f"{result.test_id:16} {result.status:8} {result.duration_seconds:.1f}s "
+                f"{result.test_id:16} {scope:8} {result.status:8} {result.duration_seconds:.1f}s "
                 f"rc={result.return_code} {result.status_reason}"
             )
         lines.extend(

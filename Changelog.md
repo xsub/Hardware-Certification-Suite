@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-01 - certification policy preset
+
+- Added a built-in `certification` runner preset for ordinary automated
+  AlmaLinux hardware certification evidence.
+- The preset marks required automated tests separately from optional automated
+  tests and records manual USB/PXE checks that remain outside the automated
+  runner.
+- Runner plans, requested config, JSON step results, JSON summaries, and
+  plain-text reports now include a per-test scope such as `required`,
+  `optional`, or `profile`.
+- Local `hcs-runner.yml` can override the built-in `certification` preset when
+  Certification SIG or ALOSF policy changes.
+- Updated README and the example runner config with the certification preset
+  and text preview.
+
 ## 2026-06-01 - interactive presets and GPU Burn snap support
 
 - Added `hcs configure`, a Rich prompt UI for creating named runner presets in

@@ -107,6 +107,11 @@ Initial interactive runner behavior:
 - let each enabled test choose its own profile from `check` through `extreme`
 - allow duration caps for tests that support time limits; when both a profile
   and a duration cap are present, use the more restrictive value
+- provide a built-in `certification` preset that encodes the current ALOSF /
+  Certification SIG policy for required automated tests, optional automated
+  tests, and manual checks
+- show required/optional scope in the runner plan and write it into report
+  artifacts
 - store the default preset name under `run.default_preset`, so `hcs run` can
   use the saved lab configuration without requiring the operator to repeat
   flags

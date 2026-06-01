@@ -9,6 +9,7 @@ from .profiles import PROFILES, TESTS
 
 
 DEFAULT_PRESET_NAME = "default"
+CERTIFICATION_PRESET_NAME = "certification"
 PROFILE_ORDER = ("check", "short", "medium", "long", "very_long", "extreme")
 DURATION_VAR_BY_TEST = {
     "cpu": "cpu_duration",
@@ -21,6 +22,89 @@ GPU_BURN_SNAP_VARS = {
     "install": "gpu_burn_install_snap",
     "remove_after": "gpu_burn_remove_snap_after",
     "package": "gpu_burn_snap_package",
+}
+BUILTIN_PRESETS: dict[str, dict[str, object]] = {
+    CERTIFICATION_PRESET_NAME: {
+        "description": "ALOSF certification policy preset for ordinary automated hardware certification evidence.",
+        "profile": "long",
+        "inventory": "127.0.0.1,",
+        "connection": "local",
+        "repeat": 1,
+        "tests": {
+            "hw_detection": {
+                "enabled": True,
+                "required": True,
+                "profile": "check",
+            },
+            "containers": {
+                "enabled": True,
+                "required": True,
+                "profile": "medium",
+            },
+            "kvm": {
+                "enabled": True,
+                "required": True,
+                "profile": "medium",
+            },
+            "cpu": {
+                "enabled": True,
+                "required": True,
+                "profile": "long",
+                "duration": "30m",
+            },
+            "network": {
+                "enabled": True,
+                "required": True,
+                "profile": "long",
+                "duration": "3600",
+            },
+            "ltp": {
+                "enabled": True,
+                "required": True,
+                "profile": "long",
+            },
+            "phoronix": {
+                "enabled": True,
+                "required": True,
+                "profile": "long",
+            },
+            "raid": {
+                "enabled": False,
+                "required": False,
+                "profile": "medium",
+                "duration": "600",
+                "reason": "Run when the SUT has MD RAID or storage topology relevant to certification.",
+            },
+            "gpu_burn": {
+                "enabled": False,
+                "required": False,
+                "profile": "medium",
+                "duration": "900",
+                "reason": "Run when the SUT includes supported NVIDIA GPUs and nvidia-smi works.",
+                "snap": {
+                    "package": "gpu-burn",
+                    "install": False,
+                    "remove_after": True,
+                },
+            },
+            "cllimits": {
+                "enabled": False,
+                "required": False,
+                "profile": "medium",
+                "reason": "CloudLinux-specific validation, not part of ordinary AlmaLinux hardware certification.",
+            },
+        },
+        "manual_tests": {
+            "usb": {
+                "required": True,
+                "reason": "Interactive physical-port validation is handled through interactive.yml.",
+            },
+            "pxe": {
+                "required": True,
+                "reason": "Interactive boot/network validation is handled through interactive.yml.",
+            },
+        },
+    }
 }
 
 
@@ -53,6 +137,8 @@ def get_preset(config: Mapping[str, object], name: str | None) -> dict[str, obje
     if not isinstance(presets, Mapping):
         raise ValueError("runner config presets must be a mapping")
     preset = presets.get(name)
+    if preset is None:
+        preset = BUILTIN_PRESETS.get(name)
     if preset is None:
         raise ValueError(f"runner preset not found: {name}")
     if not isinstance(preset, Mapping):
@@ -124,6 +210,19 @@ def preset_selected_tests(preset: Mapping[str, object] | None) -> tuple[str, ...
             selected.append(test_id)
         return tuple(selected)
     raise ValueError("runner preset tests must be a list or mapping")
+
+
+def preset_test_scopes(preset: Mapping[str, object] | None) -> dict[str, str]:
+    tests = preset_tests_section(preset)
+    if not isinstance(tests, Mapping):
+        return {}
+    scopes: dict[str, str] = {}
+    for raw_test_id, raw_config in tests.items():
+        test_id = validate_test_id(str(raw_test_id))
+        if not isinstance(raw_config, Mapping):
+            continue
+        scopes[test_id] = "required" if raw_config.get("required") is True else "optional"
+    return scopes
 
 
 def preset_test_profiles(preset: Mapping[str, object] | None) -> dict[str, str]:

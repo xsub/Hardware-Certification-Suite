@@ -85,11 +85,11 @@ Local IP: 192.0.2.10 (eth0)
 │ Inventory: 127.0.0.1,                                                                               │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
-┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃   # ┃ Test               ┃ Tag          ┃ Profile ┃
-┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ 001 │ Hardware detection │ hw_detection │ check   │
-└─────┴────────────────────┴──────────────┴─────────┘
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃   # ┃ Test               ┃ Tag          ┃ Profile ┃ Scope   ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ 001 │ Hardware detection │ hw_detection │ check   │ profile │
+└─────┴────────────────────┴──────────────┴─────────┴─────────┘
 Repeat: 2 passes, 2 total steps
 
 Suite progress 0/2
@@ -141,8 +141,8 @@ run.report.txt
     CPU: Intel Core Processor (Haswell, no TSX) (1 logical CPUs)
     GPU: Cirrus Logic GD 5446
   Results:
-    001 pass=01/02 hw_detection  passed  68.2s rc=0 ok
-    002 pass=02/02 hw_detection  passed  75.0s rc=0 ok
+    001 pass=01/02 hw_detection  profile  passed  68.2s rc=0 ok
+    002 pass=02/02 hw_detection  profile  passed  75.0s rc=0 ok
 ```
 
 ## Official Program
@@ -168,6 +168,8 @@ pages.
 - A built-in AlmaLinux identity header with logo and system facts, without
   requiring `fastfetch`, `neofetch`, or any system-wide helper package.
 - Built-in run profiles from `check` through `extreme`.
+- A built-in `certification` preset that separates required automated tests,
+  optional automated tests, and manual certification checks.
 - Named runner presets created by a Rich prompt UI and saved in
   `hcs-runner.yml`.
 - One sandbox directory per certification run.
@@ -253,6 +255,18 @@ python -m hcs configure --preset default
 python -m hcs run --preset default
 ```
 
+Use the built-in certification policy preset:
+
+```bash
+python -m hcs run --preset certification
+python -m hcs run --preset certification --dry-run
+```
+
+`certification` is the ALOSF / Certification SIG policy preset for ordinary
+automated hardware certification evidence. It runs the required automated
+checks by default and declares optional automated checks in the preset schema.
+Local `hcs-runner.yml` can override this preset when that policy changes.
+
 `hcs configure` stores the preset in `hcs-runner.yml`. It asks which tests to
 include, which profile each selected test should use, optional duration caps,
 and GPU Burn snap behavior. When `run.default_preset` is set, `python -m hcs
@@ -273,24 +287,24 @@ Repeat passes (1): 2
 Select tests
 Use Enter to accept defaults. Each selected test can use its own profile.
 
-[x] Hardware detection (hw_detection) [y/n] (y): y
+[x] Hardware detection (hw_detection, optional) [y/n] (y): y
   Profile for hw_detection [check/short/medium/long/very_long/extreme] (check): check
 
-[ ] Containers (containers) [y/n] (n): n
-[ ] KVM (kvm) [y/n] (n): n
-[ ] CPU stress (cpu) [y/n] (n): n
-[ ] Network (network) [y/n] (n): n
-[ ] MD RAID (raid) [y/n] (n): n
-[ ] Linux Test Project (ltp) [y/n] (n): n
-[ ] Phoronix (phoronix) [y/n] (n): n
+[ ] Containers (containers, optional) [y/n] (n): n
+[ ] KVM (kvm, optional) [y/n] (n): n
+[ ] CPU stress (cpu, optional) [y/n] (n): n
+[ ] Network (network, optional) [y/n] (n): n
+[ ] MD RAID (raid, optional) [y/n] (n): n
+[ ] Linux Test Project (ltp, optional) [y/n] (n): n
+[ ] Phoronix (phoronix, optional) [y/n] (n): n
 
-[ ] GPU Burn (gpu_burn) [y/n] (n): y
+[ ] GPU Burn (gpu_burn, optional) [y/n] (n): y
   Profile for gpu_burn [check/short/medium/long/very_long/extreme] (check): medium
   Duration cap (empty = profile default): 5m
   Allow installing gpu-burn snap when snapd exists and no binary is available [y/n] (n): y
   Remove gpu-burn snap at the end if HCS installed it [y/n] (y): y
 
-[ ] CloudLinux limits (cllimits) [y/n] (n): n
+[ ] CloudLinux limits (cllimits, optional) [y/n] (n): n
 
 Saved preset gpu-burn-check to hcs-runner.yml
 Run it with: python -m hcs run --preset gpu-burn-check
@@ -312,9 +326,11 @@ presets:
     tests:
       hw_detection:
         enabled: true
+        required: false
         profile: check
       gpu_burn:
         enabled: true
+        required: false
         profile: medium
         duration: 5m
         snap:
@@ -339,12 +355,12 @@ $ python -m hcs run --preset gpu-burn-check --dry-run
 │ Inventory: 127.0.0.1,                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
-┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃   # ┃ Test               ┃ Tag          ┃ Profile ┃
-┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ 001 │ Hardware detection │ hw_detection │ check   │
-│ 002 │ GPU Burn           │ gpu_burn     │ medium  │
-└─────┴────────────────────┴──────────────┴─────────┘
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
+┃   # ┃ Test               ┃ Tag          ┃ Profile ┃ Scope    ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
+│ 001 │ Hardware detection │ hw_detection │ check   │ optional │
+│ 002 │ GPU Burn           │ gpu_burn     │ medium  │ optional │
+└─────┴────────────────────┴──────────────┴─────────┴──────────┘
 Repeat: 2 passes, 4 total steps
 
 SKIP 001 pass=01/02 Hardware detection
@@ -355,10 +371,48 @@ SKIP 004 pass=02/02 GPU Burn
 run.report.txt
   Status: passed
   Results:
-    001 pass=01/02 hw_detection  skipped  0.0s rc=None dry-run
-    002 pass=01/02 gpu_burn      skipped  0.0s rc=None dry-run
-    003 pass=02/02 hw_detection  skipped  0.0s rc=None dry-run
-    004 pass=02/02 gpu_burn      skipped  0.0s rc=None dry-run
+    001 pass=01/02 hw_detection  optional  skipped  0.0s rc=None dry-run
+    002 pass=01/02 gpu_burn      optional  skipped  0.0s rc=None dry-run
+    003 pass=02/02 hw_detection  optional  skipped  0.0s rc=None dry-run
+    004 pass=02/02 gpu_burn      optional  skipped  0.0s rc=None dry-run
+```
+
+Built-in certification preset preview:
+
+```text
+$ python -m hcs run --preset certification --dry-run
+
+╭─────────────────── AlmaLinux Hardware Certification Suite ───────────────────╮
+│ Preset: certification                                                        │
+│ Profile: long                                                                │
+│ Mode: Extended certification pass with LTP and Phoronix.                     │
+│ Run ID: long-31bda138                                                        │
+│ Sandbox: /tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138             │
+│ Runner artifacts:                                                            │
+│ /tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138/runner               │
+│ Inventory: 127.0.0.1,                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                  Planned certification steps
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
+┃   # ┃ Test               ┃ Tag          ┃ Profile ┃ Scope    ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
+│ 001 │ Hardware detection │ hw_detection │ check   │ required │
+│ 002 │ Containers         │ containers   │ medium  │ required │
+│ 003 │ KVM                │ kvm          │ medium  │ required │
+│ 004 │ CPU stress         │ cpu          │ long    │ required │
+│ 005 │ Network            │ network      │ long    │ required │
+│ 006 │ Linux Test Project │ ltp          │ long    │ required │
+│ 007 │ Phoronix           │ phoronix     │ long    │ required │
+└─────┴────────────────────┴──────────────┴─────────┴──────────┘
+
+Optional automated tests declared by this preset:
+  raid       Run when MD RAID or storage topology is relevant.
+  gpu_burn   Run when supported NVIDIA GPUs and nvidia-smi are available.
+  cllimits   Run only for CloudLinux-specific validation.
+
+Manual certification checks tracked outside the automated runner:
+  usb        Interactive physical-port validation through interactive.yml.
+  pxe        Interactive boot/network validation through interactive.yml.
 ```
 
 Run one automated test locally through the runner:

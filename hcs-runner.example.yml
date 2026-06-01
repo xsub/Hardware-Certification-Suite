@@ -33,12 +33,79 @@ presets:
     tests:
       hw_detection:
         enabled: true
+        required: false
         profile: check
       gpu_burn:
         enabled: false
+        required: false
         profile: check
         duration: 60
         snap:
           package: gpu-burn
           install: false
           remove_after: true
+  certification:
+    description: ALOSF certification policy preset for ordinary automated hardware certification evidence.
+    profile: long
+    inventory: 127.0.0.1,
+    connection: local
+    repeat: 1
+    tests:
+      hw_detection:
+        enabled: true
+        required: true
+        profile: check
+      containers:
+        enabled: true
+        required: true
+        profile: medium
+      kvm:
+        enabled: true
+        required: true
+        profile: medium
+      cpu:
+        enabled: true
+        required: true
+        profile: long
+        duration: 30m
+      network:
+        enabled: true
+        required: true
+        profile: long
+        duration: 3600
+      ltp:
+        enabled: true
+        required: true
+        profile: long
+      phoronix:
+        enabled: true
+        required: true
+        profile: long
+      raid:
+        enabled: false
+        required: false
+        profile: medium
+        duration: 600
+        reason: Run when the SUT has MD RAID or storage topology relevant to certification.
+      gpu_burn:
+        enabled: false
+        required: false
+        profile: medium
+        duration: 900
+        reason: Run when the SUT includes supported NVIDIA GPUs and nvidia-smi works.
+        snap:
+          package: gpu-burn
+          install: false
+          remove_after: true
+      cllimits:
+        enabled: false
+        required: false
+        profile: medium
+        reason: CloudLinux-specific validation, not part of ordinary AlmaLinux hardware certification.
+    manual_tests:
+      usb:
+        required: true
+        reason: Interactive physical-port validation is handled through interactive.yml.
+      pxe:
+        required: true
+        reason: Interactive boot/network validation is handled through interactive.yml.

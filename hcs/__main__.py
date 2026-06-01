@@ -26,6 +26,7 @@ from .presets import (
     preset_str,
     preset_test_extra_vars,
     preset_test_profiles,
+    preset_test_scopes,
 )
 from .profiles import PROFILES, TESTS
 from .runner import CertificationRunner, RunnerOptions, parse_extra_vars, render_profiles, render_tests
@@ -129,23 +130,25 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
 
     selected_tests: dict[str, object] = {}
     for test_id, test in TESTS.items():
+        test_cfg = existing_test_config(existing, test_id)
+        required = isinstance(test_cfg, Mapping) and test_cfg.get("required") is True
         default_enabled = existing_test_enabled(existing, test_id, test_id in PROFILES[base_profile].tests)
         checkbox = escape("[x]" if default_enabled else "[ ]")
+        scope = "required" if required else "optional"
         enabled = Confirm.ask(
-            f"{checkbox} {test.display_name} ({test_id})",
+            f"{checkbox} {test.display_name} ({test_id}, {scope})",
             default=default_enabled,
         )
         if not enabled:
-            selected_tests[test_id] = {"enabled": False}
+            selected_tests[test_id] = {"enabled": False, "required": required}
             continue
 
-        test_cfg = existing_test_config(existing, test_id)
         step_profile = Prompt.ask(
             f"  Profile for {test_id}",
             choices=list(PROFILE_ORDER),
             default=str(test_cfg.get("profile") or base_profile),
         )
-        entry: dict[str, object] = {"enabled": True, "profile": step_profile}
+        entry: dict[str, object] = {"enabled": True, "required": required, "profile": step_profile}
 
         if test_id in DURATION_VAR_BY_TEST:
             duration = Prompt.ask(
@@ -228,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
             selected_tests = tuple(args.test) if args.test else preset_selected_tests(preset)
             test_profiles = preset_test_profiles(preset)
             test_extra_vars = preset_test_extra_vars(preset)
+            test_scopes = preset_test_scopes(preset)
             sandbox_dir = args.sandbox_dir or args.legacy_work_dir or args.legacy_run_dir
             paths = build_sandbox_paths(
                 config=config,
@@ -240,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(str(exc))
 
         options = RunnerOptions(
+            preset_name=preset_name,
             profile=profile,
             inventory=inventory,
             connection=connection,
@@ -249,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
             selected_tests=selected_tests,
             test_profiles=test_profiles,
             test_extra_vars=test_extra_vars,
+            test_scopes=test_scopes,
             repeat=repeat,
             dry_run=args.dry_run,
             stop_on_failure=args.stop_on_failure,
