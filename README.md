@@ -109,6 +109,35 @@ Ansible recap lines are parsed, so a task reported as `ignored=1`,
 `failed>0`, or `unreachable>0` is treated as a failed runner step even when
 Ansible exits with status `0`.
 
+Example `check` run captured on an AlmaLinux 10 VPS with Python 3.14:
+
+```text
+╭───────────────────────────── AlmaLinux Hardware Certification Suite ─────────────────────────────╮
+│ Profile: check                                                                                   │
+│ Mode: Fast sanity pass for runner, inventory, and hardware discovery.                            │
+│ Run ID: readme-check-vps                                                                         │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps                          │
+│ Runner artifacts: /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps/runner          │
+│ Inventory: 127.0.0.1,                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Planned certification steps
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃   # ┃ Test               ┃ Tag          ┃ Profile ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ 001 │ Hardware detection │ hw_detection │ check   │
+└─────┴────────────────────┴──────────────┴─────────┘
+PASS 001 pass=01/01 Hardware detection
+Suite progress                                                                                  1/1
+Hardware detection 127.0.0.1                  : ok=8    changed=4    unreachable=0    failed=0… 0/…
+╭────────────────────────────────────────── Run complete ──────────────────────────────────────────╮
+│ Sandbox:                                                                                         │
+│ /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps                                   │
+│                                                                                                  │
+│ Runner artifacts:                                                                                │
+│ /var/tmp/AlmaLinux-HCS-20260601T004116Z-RunID-readme-check-vps/runner                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
 # Suggested Run
 
 ## Local Run
