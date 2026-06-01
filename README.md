@@ -47,7 +47,7 @@ when selected tests need package installation or direct hardware access.
 
 ## The Promise
 
-| What HCS gives you | Why it matters |
+| HCS Features | Provides / Value |
 | --- | --- |
 | Guided Rich console runner | Operators see the plan, current step, pass counters, and final result without reading raw Ansible output first. |
 | Certification preset | The built-in `certification` preset separates required automated checks, optional hardware-dependent checks, and manual checks. |

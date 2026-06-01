@@ -5,6 +5,8 @@
 - Reworked the README opening into a product-first flow with a short
   certification value statement, minimal install commands, fast `check` run,
   and one-command `certification` preset path before deeper operator details.
+- Renamed the README value table headers to `HCS Features` and
+  `Provides / Value`.
 - Reduced the README to a concise onboarding page and moved detailed runner,
   Ansible, preset, GPU Burn, sandbox, remote SUT, profile, and variable
   reference material into `docs/runner.md`.
