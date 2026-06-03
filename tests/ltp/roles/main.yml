@@ -8,6 +8,11 @@
     - '{{ ltp_clone_path }}'
     - /opt/ltp
 
+- name: TEST LTP - enable CRB/PowerTools
+  community.general.dnf_config_manager:
+    name: "{{ 'powertools' if ansible_facts['distribution_major_version'] | int == 8 else 'crb' }}"
+    state: enabled
+
 - name: TEST LTP - install packages
   yum:
     name:
@@ -36,7 +41,6 @@
       - glibc-headers
     state: present
     update_cache: true
-    enablerepo: powertools
 
 - name: TEST LTP - clone repo
   git:
