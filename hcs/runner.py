@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -37,6 +40,29 @@ RECAP_RE = re.compile(
     r"ignored=(?P<ignored>\d+)"
 )
 UNSUPPORTED_RE = re.compile(r"HCS_UNSUPPORTED:\s*(?P<reason>[^\"}]+)")
+RESULT_RE = re.compile(r"HCS_RESULT:\s*(?P<status>pass|fail|unsupported)\b[ \t]*(?P<reason>[^\"}]*)")
+
+# The runner parses Ansible's default recap format; pin it so a user's
+# ANSIBLE_STDOUT_CALLBACK cannot silently break pass/fail detection.
+ANSIBLE_ENV = {
+    "ANSIBLE_STDOUT_CALLBACK": "default",
+    "ANSIBLE_NOCOLOR": "1",
+    "ANSIBLE_FORCE_COLOR": "0",
+}
+
+
+def ansible_subprocess_env(base: Mapping[str, str] | None = None) -> dict[str, str]:
+    env = dict(os.environ if base is None else base)
+    env.update(ANSIBLE_ENV)
+    return env
+
+
+def terminate_process_group(process: subprocess.Popen) -> None:
+    """Stop a child started with start_new_session and its descendants."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
 
 
 @dataclass
@@ -111,6 +137,33 @@ def recap_has_failures(recap: dict[str, dict[str, int]]) -> bool:
         or stats.get("ignored", 0) > 0
         for stats in recap.values()
     )
+
+
+def derive_status(
+    *,
+    return_code: int | None,
+    result_status: str | None,
+    result_reason: str | None,
+    unsupported_reason: str | None,
+    recap: dict[str, dict[str, int]],
+) -> tuple[str, str]:
+    """Map run signals to a step status, most authoritative signal first.
+
+    An explicit ``HCS_RESULT: fail`` from a role wins, then a non-zero ansible
+    return code, then an explicit ``HCS_RESULT: pass`` (which overrides tolerated
+    ``ignored`` recap noise), then an unsupported marker, then the recap heuristic.
+    """
+    if result_status == "fail":
+        return "failed", result_reason or "HCS_RESULT: fail"
+    if return_code not in (0, None):
+        return "failed", f"ansible-playbook returned {return_code}"
+    if result_status == "pass":
+        return "passed", result_reason or "ok"
+    if result_status == "unsupported" or unsupported_reason is not None:
+        return "unsupported", result_reason or unsupported_reason or "unsupported"
+    if recap_has_failures(recap):
+        return "failed", "ansible recap reported failed, unreachable, or ignored tasks"
+    return "passed", "ok"
 
 
 def run_status(results: list[StepResult]) -> str:
@@ -403,6 +456,8 @@ class CertificationRunner:
 
         ansible_recap: dict[str, dict[str, int]] = {}
         unsupported_reason: str | None = None
+        result_status: str | None = None
+        result_reason: str | None = None
         with console_log.open("w", encoding="utf-8", errors="replace") as handle:
             handle.write(f"$ {shlex.join(command)}\n\n")
             process = subprocess.Popen(
@@ -413,38 +468,43 @@ class CertificationRunner:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
+                env=ansible_subprocess_env(),
+                start_new_session=True,
             )
             assert process.stdout is not None
-            for line in process.stdout:
-                handle.write(line)
-                stripped = line.strip()
-                if stripped:
-                    unsupported = UNSUPPORTED_RE.search(stripped)
-                    if unsupported and unsupported_reason is None:
-                        unsupported_reason = unsupported.group("reason")
-                    recap = parse_recap_line(stripped)
-                    if recap:
-                        host, stats = recap
-                        ansible_recap[host] = stats
-                    progress.update(
-                        task_id,
-                        description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
-                    )
-            return_code = process.wait()
+            try:
+                for line in process.stdout:
+                    handle.write(line)
+                    stripped = line.strip()
+                    if stripped:
+                        result = RESULT_RE.search(stripped)
+                        if result and result_status is None:
+                            result_status = result.group("status")
+                            result_reason = (result.group("reason") or "").strip() or None
+                        unsupported = UNSUPPORTED_RE.search(stripped)
+                        if unsupported and unsupported_reason is None:
+                            unsupported_reason = unsupported.group("reason").strip()
+                        recap = parse_recap_line(stripped)
+                        if recap:
+                            host, stats = recap
+                            ansible_recap[host] = stats
+                        progress.update(
+                            task_id,
+                            description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
+                        )
+                return_code = process.wait()
+            except KeyboardInterrupt:
+                terminate_process_group(process)
+                raise
 
         finished_at = utc_timestamp()
-        if return_code != 0:
-            status = "failed"
-            status_reason = f"ansible-playbook returned {return_code}"
-        elif unsupported_reason is not None:
-            status = "unsupported"
-            status_reason = unsupported_reason
-        elif recap_has_failures(ansible_recap):
-            status = "failed"
-            status_reason = "ansible recap reported failed, unreachable, or ignored tasks"
-        else:
-            status = "passed"
-            status_reason = "ok"
+        status, status_reason = derive_status(
+            return_code=return_code,
+            result_status=result_status,
+            result_reason=result_reason,
+            unsupported_reason=unsupported_reason,
+            recap=ansible_recap,
+        )
         return StepResult(
             step=step,
             pass_index=pass_index,
@@ -475,7 +535,27 @@ class CertificationRunner:
         started_at = utc_timestamp()
         results: list[StepResult] = []
         overall_exit = 0
+        interrupted = False
+        try:
+            overall_exit = self._execute_plan(tests, results)
+        except KeyboardInterrupt:
+            interrupted = True
+            overall_exit = 130
+            self.console.print("\n[yellow]Interrupted — writing partial report.[/yellow]")
+        finally:
+            self.write_summary(results, started_at, utc_timestamp())
 
+        self.console.print(
+            Panel(
+                f"Sandbox:\n[bold]{self.paths.sandbox_dir}[/bold]\n\n"
+                f"Runner artifacts:\n[bold]{self.run_dir}[/bold]",
+                title="Run interrupted" if interrupted else "Run complete",
+            )
+        )
+        return overall_exit
+
+    def _execute_plan(self, tests: list[TestSpec], results: list[StepResult]) -> int:
+        overall_exit = 0
         with Progress(
             SpinnerColumn(),
             TextColumn("{task.description}"),
@@ -515,16 +595,6 @@ class CertificationRunner:
                             break
                 if should_stop:
                     break
-
-        finished_at = utc_timestamp()
-        self.write_summary(results, started_at, finished_at)
-        self.console.print(
-            Panel(
-                f"Sandbox:\n[bold]{self.paths.sandbox_dir}[/bold]\n\n"
-                f"Runner artifacts:\n[bold]{self.run_dir}[/bold]",
-                title="Run complete",
-            )
-        )
         return overall_exit
 
 
