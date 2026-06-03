@@ -42,7 +42,7 @@
   local_action: copy content="Failed, don't have enough free disk space" dest="{{ lts_logs_dir }}/phoronix.log"
   when: df_output.stdout|int < test_phoronix['need_space']|int
 
-- when: df_output.stdout|int > test_phoronix['need_space']|int
+- when: df_output.stdout|int >= test_phoronix['need_space']|int
   block:
     - name: Phoronix - install EPEL
       ansible.builtin.package:
