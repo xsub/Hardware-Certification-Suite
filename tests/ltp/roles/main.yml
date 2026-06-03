@@ -32,7 +32,6 @@
       - perl-libwww-perl
       - pkg-config
       - pkgconf
-      - redhat-lsb-core
       - libmnl-devel
       - bison
       - flex
@@ -50,7 +49,7 @@
     version: '20220121'
 
 - name: TEST LTP - compile
-  shell: "cd {{ ltp_clone_path | quote }} ; make autotools ; ./configure >> {{ (hcs_scratch_dir + '/configure-ltp.log') | quote }}; make -j ; make install"
+  shell: "cd {{ ltp_clone_path | quote }} ; make autotools ; ./configure >> {{ (hcs_scratch_dir + '/configure-ltp.log') | quote }}; make -j$(nproc) ; make install"
   ignore_errors: true
 
 - name: TEST LTP - run
@@ -80,7 +79,6 @@
       - perl-libwww-perl
       - pkg-config
       - pkgconf
-      - redhat-lsb-core
       - libmnl-devel
       - bison
       - flex
