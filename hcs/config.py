@@ -11,7 +11,7 @@ import uuid
 import yaml
 
 
-DEFAULT_BASE_DIR = Path("/tmp")
+DEFAULT_BASE_DIR = Path("/var/tmp")
 DEFAULT_CONFIG_PATH = Path("hcs-runner.yml")
 
 
