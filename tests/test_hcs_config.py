@@ -18,6 +18,23 @@ class RunnerConfigTests(unittest.TestCase):
             finally:
                 os.chdir(previous)
 
+    def test_default_base_dir_is_var_tmp(self) -> None:
+        with TemporaryDirectory() as tmp:
+            previous = Path.cwd()
+            try:
+                os.chdir(tmp)
+                paths = build_sandbox_paths(
+                    config={},
+                    profile="check",
+                    base_dir=None,
+                    sandbox_dir=None,
+                    run_id=None,
+                )
+            finally:
+                os.chdir(previous)
+
+        self.assertEqual(paths.sandbox_dir.parent, Path("/var/tmp"))
+
     def test_default_config_is_loaded_from_current_directory(self) -> None:
         with TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "hcs-runner.yml"

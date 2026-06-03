@@ -187,7 +187,7 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
     if not isinstance(run_config, dict):
         console.print("[red]Cannot update config:[/red] run section must be a mapping")
         return 2
-    run_config.setdefault("base_dir", "/tmp")
+    run_config.setdefault("base_dir", "/var/tmp")
     run_config["default_preset"] = preset_name
 
     presets = config.setdefault("presets", {})
