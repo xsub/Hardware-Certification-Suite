@@ -65,6 +65,14 @@ def terminate_process_group(process: subprocess.Popen) -> None:
         pass
 
 
+UI_REFRESH_SECONDS = 0.1
+
+
+def should_refresh_ui(last: float, now: float, interval: float = UI_REFRESH_SECONDS) -> bool:
+    """Throttle live-line UI updates; verbose suites emit thousands of lines."""
+    return (now - last) >= interval
+
+
 @dataclass
 class RunnerOptions:
     preset_name: str | None
@@ -472,6 +480,7 @@ class CertificationRunner:
                 start_new_session=True,
             )
             assert process.stdout is not None
+            last_ui = 0.0
             try:
                 for line in process.stdout:
                     handle.write(line)
@@ -488,10 +497,13 @@ class CertificationRunner:
                         if recap:
                             host, stats = recap
                             ansible_recap[host] = stats
-                        progress.update(
-                            task_id,
-                            description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
-                        )
+                        now = time.monotonic()
+                        if should_refresh_ui(last_ui, now):
+                            last_ui = now
+                            progress.update(
+                                task_id,
+                                description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
+                            )
                 return_code = process.wait()
             except KeyboardInterrupt:
                 terminate_process_group(process)

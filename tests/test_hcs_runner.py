@@ -18,6 +18,7 @@ from hcs.runner import (
     derive_status,
     parse_recap_line,
     run_status,
+    should_refresh_ui,
 )
 
 
@@ -205,6 +206,14 @@ class GracefulStopTests(unittest.TestCase):
             self.assertEqual(exit_code, 130)
             self.assertTrue((runner.run_dir / "run.summary.json").exists())
             self.assertTrue((runner.run_dir / "run.report.txt").exists())
+
+
+class ProgressThrottleTests(unittest.TestCase):
+    def test_refreshes_after_interval(self) -> None:
+        self.assertTrue(should_refresh_ui(0.0, 0.2, interval=0.1))
+
+    def test_skips_within_interval(self) -> None:
+        self.assertFalse(should_refresh_ui(1.0, 1.05, interval=0.1))
 
 
 class AnsibleEnvTests(unittest.TestCase):
