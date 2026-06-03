@@ -36,3 +36,48 @@ jobs:
 
       - name: Validate shell script syntax on AlmaLinux
         run: bash .github/scripts/check-shell-syntax.sh
+
+  almalinux-functional:
+    name: AlmaLinux ${{ matrix.version }} functional run
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - "9"
+          - "10"
+
+    steps:
+      - name: Install runtime
+        run: |
+          dnf -y install git python3 python3-pip ansible-core util-linux pciutils
+          python3 -m pip install --upgrade pip
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install runner dependencies
+        run: python3 -m pip install -r requirements-runner.txt
+
+      - name: Check profile passes end to end
+        run: |
+          python3 -m hcs run --profile check --inventory 127.0.0.1, -c local --sandbox-dir "$PWD/ci-check"
+          python3 - <<'PY'
+          import json
+          summary = json.load(open("ci-check/runner/run.summary.json"))
+          assert summary["status"] == "passed", summary["status"]
+          print("check status:", summary["status"])
+          PY
+
+      - name: Network degrades to unsupported on a single host
+        run: |
+          python3 -m hcs run --test network --inventory 127.0.0.1, -c local --sandbox-dir "$PWD/ci-net"
+          python3 - <<'PY'
+          import json
+          summary = json.load(open("ci-net/runner/run.summary.json"))
+          network = next(r for r in summary["results"] if r["test_id"] == "network")
+          assert network["status"] == "unsupported", network
+          print("network status:", network["status"], "-", network["status_reason"])
+          PY
