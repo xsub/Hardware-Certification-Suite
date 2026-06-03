@@ -4,8 +4,17 @@ Critical defects only: issues that yield **wrong certification evidence**, **los
 evidence**, or **break the documented default run** (`--inventory 127.0.0.1, -c local`).
 Lower-severity items live in the audit, not here.
 
-**Status: C1–C8 implemented and verified** (unit tests + YAML/shell lint + an
-AlmaLinux 9/10 functional CI job). See git history for the per-item commits.
+**Status: C1–C8 and P1–P4 implemented, unit-tested, and validated on a live
+AlmaLinux 10.2 VPS.** `check` (pipeline), `containers` (podman), and `network`
+(`unsupported` on a single host) all behaved as designed; the LTP fixes ran clean
+up to an unrelated pre-existing compile failure (see Follow-ups). See git history
+for the per-item commits.
+
+## Commit conventions
+
+Commits are authored solely by **Pawel Suchanecki <subdcc@gmail.com>**. Do not add
+`Co-Authored-By:` or any AI/assistant attribution trailers to commit messages.
+History has been rewritten to enforce this.
 
 Each fix follows the same rules:
 
@@ -250,3 +259,11 @@ Grow coverage one required test at a time (`containers`, then `kvm`).
 3. **C2, C7** — correct status semantics (single-host + result contract).
 4. **C6** — safe long runs.
 5. **C8** — regression net so the above cannot silently return.
+
+## Follow-ups surfaced by validation
+
+- **LTP pinned tag `20220121` fails to build on AlmaLinux 10.2** — GCC aborts with
+  `bp cannot be used in 'asm' here`, a known old-LTP/modern-GCC incompatibility.
+  The VPS run confirmed CRB enable (C5), package install without `redhat-lsb-core`
+  (P1), and clone all succeed; only the old-tag compile fails. Fix: bump to a
+  modern LTP release and expose it as an `ltp_version` runner var.
