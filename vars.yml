@@ -1,7 +1,9 @@
 ---
 
 # GENERAL
-_ssh_connection: "{{ hostvars[inventory_hostname]['ansible_env'].SSH_CONNECTION }}"
+_ssh_connection: "{{ hostvars[inventory_hostname].ansible_env.SSH_CONNECTION | default('') }}"
+# A real SSH_CONNECTION has 4 fields; its absence means a local/single-host run.
+network_is_remote: "{{ _ssh_connection.split() | length >= 4 }}"
 hcs_run_id: "{{ run_id|default(ansible_date_time.epoch) }}"
 hcs_run_timestamp: "{{ run_timestamp|default(ansible_date_time.iso8601_basic_short) }}"
 hcs_base_dir: "{{ base_dir|default('/tmp') }}"
@@ -10,10 +12,10 @@ hcs_work_dir: "{{ work_dir|default(hcs_sandbox_dir) }}"
 hcs_scratch_dir: "{{ scratch_dir|default(hcs_work_dir + '/scratch') }}"
 hcs_cache_dir: "{{ cache_dir|default(hcs_work_dir + '/cache') }}"
 hcs_artifacts_dir: "{{ artifacts_dir|default(hcs_work_dir + '/artifacts') }}"
-lts_ip: "{{ _ssh_connection.split(' ')[0] }}"
+lts_ip: "{{ _ssh_connection.split()[0] if network_is_remote | bool else '' }}"
 lts_tests_dir: "./tests"
 lts_logs_dir: "{{ unique_logs_folder|default(logs_dir|default(hcs_work_dir + '/logs')) }}"
-sut_ip: "{{ _ssh_connection.split(' ')[2] }}"
+sut_ip: "{{ _ssh_connection.split()[2] if network_is_remote | bool else '' }}"
 sut_tests_dir: "{{ tests_dir|default(hcs_work_dir + '/sut-tests') }}"
 
 # CPU

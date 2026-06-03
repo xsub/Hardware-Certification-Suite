@@ -1,45 +1,48 @@
 ---
 
-# Setup
-- name: Test Network - setup
-  yum:
-    name:
-      - iperf3
-      - ethtool
-      - net-tools
-    enablerepo: epel
-  loop: [lts_ip, sut_ip]
+- name: Network - requires a separate SUT
+  ansible.builtin.debug:
+    msg: "HCS_UNSUPPORTED: network test needs a distinct SUT (local/single-host run)"
+  when: not network_is_remote | bool
 
-# Required to run tests in parallel on opennebula
-- name: Ensures that the process <iperf3> is not running
-  shell: ps -aux|grep iperf3|wc -l
-  register: result
-  until: result.stdout|int <= 2
-  delegate_to: 127.0.0.1
-  retries: 1000
-  delay: 5
-  when: run_on_nebula is defined
+- name: Network - run against the SUT
+  when: network_is_remote | bool
+  block:
+    - name: Network - install tools
+      ansible.builtin.package:
+        name: [iperf3, ethtool, net-tools]
+        enablerepo: epel
 
-- pause:
-    seconds: 2
-  when: run_on_nebula is defined
+    # Required to run tests in parallel on opennebula
+    - name: Network - ensure iperf3 is not already running
+      ansible.builtin.shell: ps -aux | grep iperf3 | wc -l
+      register: result
+      until: result.stdout | int <= 2
+      delegate_to: 127.0.0.1
+      retries: 1000
+      delay: 5
+      when: run_on_nebula is defined
 
-# Test
-- name: Test Network - run test
-  ansible.builtin.command:
-    sh {{ lts_tests_dir}}/network/run_test.sh {{ lts_ip }} {{ sut_ip }}
-    {{ test_network['duration'] }} {{ test_network['speed'] }} disable-preloader {{ test_network['device'] }}
-  delegate_to: localhost
-  register: output
+    - name: Network - settle before run
+      ansible.builtin.pause:
+        seconds: 2
+      when: run_on_nebula is defined
 
-- name: Test Network - copy log
-  local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/network.log"
+    - name: Network - run test
+      ansible.builtin.command:
+        sh {{ lts_tests_dir }}/network/run_test.sh {{ lts_ip }} {{ sut_ip }}
+        {{ test_network['duration'] }} {{ test_network['speed'] }} disable-preloader {{ test_network['device'] }}
+      delegate_to: localhost
+      register: output
 
-# Cleanup
-- name: Test Network - cleanup
-  yum:
-    name:
-      - iperf3
-    state: removed
-  loop: [lts_ip, sut_ip]
-  when: run_on_nebula is not defined
+    - name: Network - copy log
+      ansible.builtin.copy:
+        content: "{{ output.stdout }}"
+        dest: "{{ lts_logs_dir }}/network.log"
+      delegate_to: localhost
+
+    - name: Network - cleanup
+      ansible.builtin.package:
+        name: [iperf3]
+        state: absent
+      when: run_on_nebula is not defined
