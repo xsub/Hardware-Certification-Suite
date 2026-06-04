@@ -55,6 +55,8 @@
 - Synced the default sandbox base to `/var/tmp` in `vars.yml` and the docs to
   match the runner, documented `--host`, `--version`, and `ltp_version`, and
   removed the redundant local flags from the runner examples.
+- Added an AlmaLinux 10 validation badge and a Compatibility section recording
+  the per-test AlmaLinux 10.2 validation results and CI matrix.
 
 ## 2026-06-01 - README product-first structure
 

@@ -4,6 +4,27 @@ This document is the detailed operator reference for the AlmaLinux Hardware
 Certification Suite runner. The product-oriented quick start lives in
 [README.md](../README.md).
 
+## Compatibility
+
+The suite targets AlmaLinux and is validated on **AlmaLinux 10.2**. The required
+automated tests have been run end to end on AlmaLinux 10.2 and behave as
+designed:
+
+| Test | AlmaLinux 10.2 result |
+| --- | --- |
+| `hw_detection` | passed |
+| `containers` | passed (podman; packages cleaned up afterward) |
+| `kvm` | passed where CPU virtualization is present; `unsupported` where it is not |
+| `cpu` | passed (`stress-ng`; operator-preinstalled packages left in place) |
+| `network` | `unsupported` on a single host; runs over SSH against a distinct SUT |
+| `ltp` | passed; builds the modern `20250930` tag (override with `ltp_version`) |
+| `phoronix` | space-bound (100–300 GB); exercised where capacity allows |
+
+CI additionally smoke-tests the runner and Ansible syntax on AlmaLinux 8, 9, and
+10, and runs the `check` profile plus the single-host `network` path
+functionally on AlmaLinux 9 and 10. Python `3.11+` is required; AlmaLinux 10
+ships Python `3.12`.
+
 ## Running Tests
 
 Use the runner for normal certification work. It wraps Ansible, creates one

@@ -4,6 +4,7 @@
 [![Python 3.11+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
+[![AlmaLinux 10 validated](https://img.shields.io/badge/AlmaLinux%209%20%7C%2010-validated-1a3a63?logo=almalinux&logoColor=white)](docs/runner.md#compatibility)
 
 Turn a fresh AlmaLinux system into repeatable hardware certification evidence.
 HCS wraps the existing Ansible test suite with a Python/Rich runner that plans
@@ -178,7 +179,7 @@ run:
 
 | Requirement | Notes |
 | --- | --- |
-| AlmaLinux SUT | Prefer a blank, freshly installed and updated AlmaLinux system. |
+| AlmaLinux SUT | Prefer a blank, freshly installed and updated AlmaLinux system. Validated on AlmaLinux 10.2; CI covers AlmaLinux 8/9/10. See [Compatibility](docs/runner.md#compatibility). |
 | Python | `3.11+` for the Rich runner. AlmaLinux 10 includes Python `3.12`; CI validates Python `3.11`, `3.12`, and `3.14`. |
 | Ansible | `ansible-core>=2.17,<2.18` is the tested range. |
 | Tools | `git`, `tmux` or `screen`, and shell access. |
