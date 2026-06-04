@@ -8,6 +8,11 @@
   become: false
   local_action: copy content="{{ kvm_compatibility.stdout }}" dest="{{ lts_logs_dir }}/kvm.log"
 
+- name: Test KVM - unsupported without CPU virtualization
+  ansible.builtin.debug:
+    msg: "HCS_UNSUPPORTED: KVM requires CPU virtualization (pre-checks rc={{ kvm_compatibility.rc }})"
+  when: kvm_compatibility.rc != 0
+
 - when: kvm_compatibility.rc == 0
   block:
     - name: Test KVM - install packages
@@ -16,6 +21,7 @@
           - qemu-kvm
           - libvirt
         state: present
+      register: kvm_pkgs
     - name: Test KVM - restart libvirtd service
       systemd:
         name: libvirtd.service
@@ -33,6 +39,7 @@
         state: link
         owner: root
         group: root
+      register: kvm_symlink
 
     # Test
     - name: Test KVM - run test
@@ -42,17 +49,30 @@
 
     - name: Test KVM - copy log
       become: false
-      local_action: copy content="{{ kvm_compatibility.stdout }}\n{{ qemu_is_ok.stdout }}\n{{ report.stdout }}" dest="{{ lts_logs_dir }}/kvm.log"
+      local_action: copy content="{{ kvm_compatibility.stdout }}\n{{ qemu_is_ok.stdout }}\n{{ report.stdout | default('') }}" dest="{{ lts_logs_dir }}/kvm.log"
+      when: report is defined
+
+    - name: Test KVM - unsupported when KVM modules or device are missing
+      ansible.builtin.debug:
+        msg: "HCS_UNSUPPORTED: KVM modules/device unavailable (qemu-checks rc={{ qemu_is_ok.rc }})"
+      when: qemu_is_ok.rc != 0
+
+    - name: Test KVM - report failure to runner
+      ansible.builtin.debug:
+        msg: "HCS_RESULT: fail kvm run_test.sh exited rc={{ report.rc }}"
+      when: report is defined and report.rc | default(0) != 0
 
     # Cleanup
-    - name: Test KVM - remove packages
+    - name: Test KVM - remove packages HCS installed
       yum:
         name:
           - qemu-kvm
           - libvirt
         state: absent
+      when: kvm_pkgs.changed
 
-    - name: Test KVM - remove qemu-kvm symlink
+    - name: Test KVM - remove qemu-kvm symlink HCS created
       file:
         path: /usr/bin/qemu-kvm
         state: absent
+      when: kvm_symlink.changed

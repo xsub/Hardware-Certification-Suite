@@ -9,3 +9,8 @@
     content: "{{ output.stdout }}"
     dest: "{{ lts_logs_dir }}/hw_detection.log"
   delegate_to: localhost
+
+- name: Test Hardware Detection - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail hw_detection run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0

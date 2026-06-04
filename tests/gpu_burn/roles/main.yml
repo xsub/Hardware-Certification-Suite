@@ -42,6 +42,11 @@
     msg: "{{ hcs_gpu_burn_unsupported }}"
   when: hcs_gpu_burn_unsupported | length > 0
 
+- name: GPU Burn - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail gpu_burn run_test.sh exited rc={{ output.rc }}"
+  when: hcs_gpu_burn_unsupported | length == 0 and output.rc | default(0) != 0
+
 - name: GPU Burn - copy console log
   ansible.builtin.copy:
     content: "{{ output.stdout }}"

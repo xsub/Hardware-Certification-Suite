@@ -1,11 +1,13 @@
 ---
 
 # Setup
-- name: Tast Raid - install dependent software
+- name: Test RAID - install dependent software
   package:
     name:
       - mdadm
       - fio
+    state: present
+  register: raid_pkgs
 
 # Necessary settings before running tests on opennebula
 - name: remember current vd
@@ -43,16 +45,27 @@
   when: run_on_nebula is defined
 
 # Test
-- name: Tast Raid - run test
+- name: Test RAID - run test
   ansible.builtin.shell: "{{ sut_tests_dir }}/raid/run_test.sh {{ test_raid['duration'] }} disable-preloader"
   register: output
 
-- name: Tast Raid - copy log
+- name: Test RAID - copy log
   local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/raid.log"
 
-# Cleaup
-- name: Tast Raid - cleanup
+- name: Test RAID - unsupported when no MD array is present
+  ansible.builtin.debug:
+    msg: "HCS_UNSUPPORTED: no MD RAID array present on the SUT"
+  when: output.stdout is search('Raid not found')
+
+- name: Test RAID - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail raid run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0
+
+# Cleanup
+- name: Test RAID - cleanup
   package:
     name:
       - fio
     state: removed
+  when: raid_pkgs.changed

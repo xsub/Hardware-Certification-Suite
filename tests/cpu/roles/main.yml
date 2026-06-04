@@ -8,8 +8,9 @@
 - name: Test cpu - install stress-ng
   yum:
     name: stress-ng
-    state: latest
+    state: present
     enablerepo: epel
+  register: cpu_stress_pkg
 
 - name: Test CPU - create scratch dir
   ansible.builtin.file:
@@ -28,8 +29,14 @@
 - name: Test CPU - copy log
   local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/cpu.log"
 
-- name: Test CPU - uninstall packages
+- name: Test CPU - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail cpu run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0
+
+- name: Test CPU - uninstall packages HCS installed
   yum:
     name:
       - stress-ng
     state: absent
+  when: cpu_stress_pkg.changed

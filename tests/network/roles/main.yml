@@ -8,10 +8,19 @@
 - name: Network - run against the SUT
   when: network_is_remote | bool
   block:
-    - name: Network - install tools
+    - name: Network - enable EPEL
       ansible.builtin.package:
-        name: [iperf3, ethtool, net-tools]
+        name: epel-release
+        state: present
+
+    - name: Network - install tools
+      # yum/dnf (not ansible.builtin.package) so enablerepo is honored; the
+      # test script also needs lshw (device discovery) and bc (rate math).
+      ansible.builtin.yum:
+        name: [iperf3, ethtool, net-tools, lshw, bc]
+        state: present
         enablerepo: epel
+      register: network_pkgs
 
     # Required to run tests in parallel on opennebula
     - name: Network - ensure iperf3 is not already running
@@ -41,8 +50,13 @@
         dest: "{{ lts_logs_dir }}/network.log"
       delegate_to: localhost
 
+    - name: Network - report failure to runner
+      ansible.builtin.debug:
+        msg: "HCS_RESULT: fail network run_test.sh exited rc={{ output.rc }}"
+      when: output.rc | default(0) != 0
+
     - name: Network - cleanup
       ansible.builtin.package:
         name: [iperf3]
         state: absent
-      when: run_on_nebula is not defined
+      when: run_on_nebula is not defined and network_pkgs.changed

@@ -16,6 +16,11 @@
     dest: "{{ lts_logs_dir }}/containers.log"
   delegate_to: localhost
 
+- name: Containers - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail containers run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0
+
 - name: Containers - cleanup packages HCS installed
   ansible.builtin.package:
     name: [podman, wget]

@@ -63,6 +63,7 @@
           - sqlite-devel
           - readline-devel
           - wireguard-tools
+      register: phoronix_pkgs
 
     - name: Phoronix - setup. Step 2.a
       yum:
@@ -106,6 +107,11 @@
 
     - name: Phoronix - copy log
       local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/phoronix.log"
+
+    - name: Phoronix - report failure to runner
+      ansible.builtin.debug:
+        msg: "HCS_RESULT: fail phoronix batch-benchmark exited rc={{ output.rc }}"
+      when: output.rc | default(0) != 0
 
     - name: Phoronix - get results
       command: ls -1 {{ test_phoronix['folder'] }}/.phoronix-test-suite/test-results/
@@ -158,3 +164,4 @@
           - google-benchmark-devel
           - expat-devel
         state: removed
+      when: phoronix_pkgs.changed

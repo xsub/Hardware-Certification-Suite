@@ -40,17 +40,20 @@
       - glibc-headers
     state: present
     update_cache: true
+  register: ltp_pkgs
 
 - name: TEST LTP - clone repo
   git:
     repo: https://github.com/linux-test-project/ltp.git
     dest: '{{ ltp_clone_path }}'
     clone: true
-    version: '20220121'
+    version: "{{ ltp_version | default('20250930') }}"
 
 - name: TEST LTP - compile
   shell: "cd {{ ltp_clone_path | quote }} ; make autotools ; ./configure >> {{ (hcs_scratch_dir + '/configure-ltp.log') | quote }}; make -j$(nproc) ; make install"
-  ignore_errors: true
+  # A tolerated compile result must not count as a failed/ignored task; the run
+  # step below is the authoritative gate (HCS_RESULT).
+  failed_when: false
 
 - name: TEST LTP - run
   shell: "{{ sut_tests_dir }}/ltp/run_test.sh {{ test_ltp['suites'] | quote }} {{ test_ltp['log_file'] | quote }}"
@@ -60,7 +63,12 @@
 - name: Test LTP - copy log
   local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/ltp.log"
 
-- name: TEST LTP - cleanup packages
+- name: TEST LTP - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail ltp run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0
+
+- name: TEST LTP - cleanup packages HCS installed
   yum:
     name:
       - automake
@@ -87,3 +95,4 @@
       - glibc-headers
     skip_broken: true
     state: absent
+  when: ltp_pkgs.changed
