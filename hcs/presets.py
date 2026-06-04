@@ -28,7 +28,6 @@ BUILTIN_PRESETS: dict[str, dict[str, object]] = {
         "description": "ALOSF certification policy preset for ordinary automated hardware certification evidence.",
         "profile": "long",
         "inventory": "127.0.0.1,",
-        "connection": "local",
         "repeat": 1,
         "tests": {
             "hw_detection": {

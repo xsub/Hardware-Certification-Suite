@@ -1,5 +1,61 @@
 # Changelog
 
+## 2026-06-04 - connection inference and role result contract
+
+### Runner and user experience
+
+- Made the local host the zero-config default target: `python -m hcs run
+  --profile check` runs against `127.0.0.1` with the local connection, so the
+  previously documented `--inventory 127.0.0.1, -c local` is no longer needed.
+- Added inventory-based connection inference. A loopback inventory uses the
+  local connection; a remote host uses SSH. This fixes a defect where a remote
+  `--inventory <SUT IP>,` (and the documented remote `certification` run)
+  silently executed on the controller through a hardcoded `-c local`, producing
+  wrong-machine certification evidence.
+- Added `--host <SUT IP>` as shorthand for `--inventory <SUT IP>,`, mutually
+  exclusive with `--inventory`.
+- Added a top-level `--version` flag.
+- Added `pyproject.toml` so the runner installs as a package (`pip install -e .`)
+  and exposes an `hcs` console script, so `hcs run ...` works as a shortcut for
+  `python -m hcs run ...`.
+- `hcs configure` now offers an `auto` connection that defers to inference and
+  is not persisted; the built-in and example `certification`/`default` presets
+  no longer pin `connection: local`.
+
+### Result integrity
+
+- Hardened runner status derivation so an explicit `HCS_RESULT: pass` overrides
+  only tolerated `ignored` recap noise, never a hard `failed` or `unreachable`
+  task.
+- Automated roles now emit the `HCS_RESULT: fail` contract with the failing
+  return code. KVM and RAID emit `HCS_UNSUPPORTED` when CPU virtualization or an
+  MD array is absent instead of silently passing a required test.
+- Marked LTP compile `failed_when: false` so a tolerated compile result no
+  longer counts as a failed step; the run step is the authoritative gate.
+
+### Ansible role fixes
+
+- Fixed a KVM undefined-variable error when the qemu installation check fails
+  after compatibility passes.
+- Network test installs `epel-release` before enabling EPEL and pulls the
+  `lshw`/`bc` tools its script needs; the install uses yum/dnf so `enablerepo`
+  is honored.
+- Package cleanup for cpu, kvm, ltp, phoronix, network, and raid now removes
+  only packages HCS installed (`when: <pkgs>.changed`).
+- Bumped the default LTP release to a modern tag and exposed it through the
+  `ltp_version` variable.
+- Fixed the "Tast Raid" task-name typos.
+
+### Tests and documentation
+
+- Added unit coverage for connection inference, the `--host`/inference
+  defaulting through `main()`, the hardened pass-vs-hard-failure precedence,
+  `build_command` extra-var precedence and sandbox injection, `parse_extra_vars`,
+  `parse_duration_seconds`, and the `sandbox_child` path-traversal guard.
+- Synced the default sandbox base to `/var/tmp` in `vars.yml` and the docs to
+  match the runner, documented `--host`, `--version`, and `ltp_version`, and
+  removed the redundant local flags from the runner examples.
+
 ## 2026-06-01 - README product-first structure
 
 - Reworked the README opening into a product-first flow with a short

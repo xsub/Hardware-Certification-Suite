@@ -265,5 +265,26 @@ Grow coverage one required test at a time (`containers`, then `kvm`).
 - **LTP pinned tag `20220121` fails to build on AlmaLinux 10.2** — GCC aborts with
   `bp cannot be used in 'asm' here`, a known old-LTP/modern-GCC incompatibility.
   The VPS run confirmed CRB enable (C5), package install without `redhat-lsb-core`
-  (P1), and clone all succeed; only the old-tag compile fails. Fix: bump to a
-  modern LTP release and expose it as an `ltp_version` runner var.
+  (P1), and clone all succeed; only the old-tag compile fails. **Done:** default
+  bumped to `20250930` and exposed as the `ltp_version` var (`--extra-var
+  ltp_version=...`); compile is now `failed_when: false` so the run step is the
+  gate. Re-run LTP end to end on the VPS to confirm the modern tag builds.
+
+## Pending VPS validation (audit follow-up PR)
+
+Implemented and unit/syntax-checked locally; needs a live AlmaLinux run before
+it is considered done, per the project rule that changes are validated on the
+VPS, not only by unit tests/lint.
+
+- **Connection inference (S1).** Confirm `python -m hcs run --profile check`
+  still runs locally and that `--host <SUT IP>` reaches a real remote SUT over
+  SSH (previously `-c local` was forced, certifying the controller).
+- **KVM honesty.** On the VPS (no nested virt) KVM should now report
+  `unsupported` instead of a silent pass; verify the undefined-`report` path is
+  gone.
+- **Conditional package cleanup.** Verify cpu/kvm/ltp/phoronix/network/raid
+  remove only what HCS installed and leave operator-preinstalled packages.
+- **Network two-host path.** `epel-release` + `lshw`/`bc` install needs a real
+  two-host run; single-host still degrades to `unsupported`.
+- **Role `HCS_RESULT: fail` emits.** Confirm a forced failure surfaces the new
+  reason string and that clean runs still pass.

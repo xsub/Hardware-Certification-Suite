@@ -11,11 +11,21 @@ from hcs.__main__ import main
 from hcs.presets import (
     get_preset,
     limiting_duration_value,
+    parse_duration_seconds,
     preset_selected_tests,
     preset_test_extra_vars,
     preset_test_profiles,
     preset_test_scopes,
 )
+
+
+def requested_config(sandbox: Path) -> dict:
+    return json.loads((sandbox / "runner" / "config.requested.json").read_text(encoding="utf-8"))
+
+
+def run_dry(*args: str) -> int:
+    with redirect_stdout(io.StringIO()):
+        return main(["run", *args, "--dry-run"])
 
 
 class RunnerPresetTests(unittest.TestCase):
@@ -56,6 +66,18 @@ class RunnerPresetTests(unittest.TestCase):
     def test_duration_cap_uses_more_restrictive_value(self) -> None:
         self.assertEqual(limiting_duration_value("gpu_burn", "check", "10m"), "60")
         self.assertEqual(limiting_duration_value("cpu", "check", "10m"), "120s")
+
+    def test_parse_duration_seconds_handles_suffixes(self) -> None:
+        self.assertEqual(parse_duration_seconds("90"), 90)
+        self.assertEqual(parse_duration_seconds("90s"), 90)
+        self.assertEqual(parse_duration_seconds("5m"), 300)
+        self.assertEqual(parse_duration_seconds("2h"), 7200)
+        self.assertEqual(parse_duration_seconds("1d"), 86400)
+
+    def test_parse_duration_seconds_rejects_garbage(self) -> None:
+        self.assertIsNone(parse_duration_seconds(""))
+        self.assertIsNone(parse_duration_seconds("ten"))
+        self.assertIsNone(parse_duration_seconds("5x"))
 
     def test_builtin_certification_preset_declares_required_and_optional_tests(self) -> None:
         preset = get_preset({}, "certification")
@@ -139,6 +161,61 @@ presets:
             ["hw_detection", "containers", "kvm", "cpu", "network", "ltp", "phoronix"],
         )
         self.assertTrue(all(result["scope"] == "required" for result in summary["results"]))
+
+
+class ConnectionDefaultingTests(unittest.TestCase):
+    def test_bare_local_run_infers_local_connection(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(run_dry("--profile", "check", "--sandbox-dir", str(sandbox)), 0)
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["inventory"], "127.0.0.1,")
+        self.assertEqual(config["connection"], "local")
+
+    def test_remote_inventory_does_not_force_local_connection(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(
+                run_dry("--profile", "check", "--inventory", "10.0.0.5,", "--sandbox-dir", str(sandbox)),
+                0,
+            )
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["inventory"], "10.0.0.5,")
+        self.assertIsNone(config["connection"])
+
+    def test_host_shorthand_targets_remote_over_ssh(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(run_dry("--profile", "check", "--host", "10.0.0.5", "--sandbox-dir", str(sandbox)), 0)
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["inventory"], "10.0.0.5,")
+        self.assertIsNone(config["connection"])
+
+    def test_explicit_connection_overrides_inference(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(
+                run_dry("--profile", "check", "--host", "10.0.0.5", "-c", "local", "--sandbox-dir", str(sandbox)),
+                0,
+            )
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["connection"], "local")
+
+    def test_certification_preset_remote_host_runs_over_ssh(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(
+                run_dry("--preset", "certification", "--host", "sut.example", "--sandbox-dir", str(sandbox)),
+                0,
+            )
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["inventory"], "sut.example,")
+        self.assertIsNone(config["connection"])
 
 
 if __name__ == "__main__":

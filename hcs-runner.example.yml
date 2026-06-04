@@ -28,7 +28,8 @@ presets:
   default:
     profile: check
     inventory: 127.0.0.1,
-    connection: local
+    # connection is inferred from the inventory when omitted: local for a
+    # loopback host, SSH for a remote SUT. Pin it only to override that.
     repeat: 1
     tests:
       hw_detection:
@@ -48,7 +49,6 @@ presets:
     description: ALOSF certification policy preset for ordinary automated hardware certification evidence.
     profile: long
     inventory: 127.0.0.1,
-    connection: local
     repeat: 1
     tests:
       hw_detection:

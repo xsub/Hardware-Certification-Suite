@@ -50,6 +50,24 @@ ANSIBLE_ENV = {
     "ANSIBLE_FORCE_COLOR": "0",
 }
 
+# Inventories naming only these hosts run with the local connection; anything
+# that names a distinct host must run over SSH.
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "ip6-localhost"})
+
+
+def default_connection(inventory: str) -> str | None:
+    """Infer the Ansible connection from the inventory when none is set.
+
+    A loopback-only inventory runs locally; anything that names a distinct host
+    returns ``None`` so the runner omits ``-c`` and Ansible uses its configured
+    default (SSH). This stops a remote SUT from being silently certified on the
+    controller via a hardcoded ``-c local`` — wrong-machine evidence.
+    """
+    hosts = [host.strip() for host in inventory.split(",") if host.strip()]
+    if hosts and all(host in LOOPBACK_HOSTS for host in hosts):
+        return "local"
+    return None
+
 
 def ansible_subprocess_env(base: Mapping[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ if base is None else base)
@@ -138,12 +156,18 @@ def parse_recap_line(line: str) -> tuple[str, dict[str, int]] | None:
     return host, stats
 
 
-def recap_has_failures(recap: dict[str, dict[str, int]]) -> bool:
+def recap_has_hard_failures(recap: dict[str, dict[str, int]]) -> bool:
+    """Recap shows a real failure: a failed or unreachable task."""
     return any(
-        stats.get("unreachable", 0) > 0
-        or stats.get("failed", 0) > 0
-        or stats.get("ignored", 0) > 0
+        stats.get("unreachable", 0) > 0 or stats.get("failed", 0) > 0
         for stats in recap.values()
+    )
+
+
+def recap_has_failures(recap: dict[str, dict[str, int]]) -> bool:
+    """Recap shows a hard failure or a tolerated ``ignored`` task."""
+    return recap_has_hard_failures(recap) or any(
+        stats.get("ignored", 0) > 0 for stats in recap.values()
     )
 
 
@@ -158,19 +182,23 @@ def derive_status(
     """Map run signals to a step status, most authoritative signal first.
 
     An explicit ``HCS_RESULT: fail`` from a role wins, then a non-zero ansible
-    return code, then an explicit ``HCS_RESULT: pass`` (which overrides tolerated
-    ``ignored`` recap noise), then an unsupported marker, then the recap heuristic.
+    return code, then a hard recap failure (a failed/unreachable task, which an
+    explicit pass must never mask), then an explicit ``HCS_RESULT: pass`` (which
+    *does* override tolerated ``ignored`` recap noise), then an unsupported
+    marker, then the recap heuristic for the no-contract path.
     """
     if result_status == "fail":
         return "failed", result_reason or "HCS_RESULT: fail"
     if return_code not in (0, None):
         return "failed", f"ansible-playbook returned {return_code}"
+    if recap_has_hard_failures(recap):
+        return "failed", "ansible recap reported failed or unreachable tasks"
     if result_status == "pass":
         return "passed", result_reason or "ok"
     if result_status == "unsupported" or unsupported_reason is not None:
         return "unsupported", result_reason or unsupported_reason or "unsupported"
     if recap_has_failures(recap):
-        return "failed", "ansible recap reported failed, unreachable, or ignored tasks"
+        return "failed", "ansible recap reported ignored tasks"
     return "passed", "ok"
 
 
@@ -180,6 +208,22 @@ def run_status(results: list[StepResult]) -> str:
     if any(result.status == "unsupported" for result in results):
         return "passed_with_warnings"
     return "passed"
+
+
+@dataclass
+class RunRecap:
+    counts: dict[str, int]
+    total_seconds: float
+    slowest: StepResult | None
+
+
+def summarize_results(results: list[StepResult]) -> RunRecap:
+    counts = {"passed": 0, "failed": 0, "unsupported": 0, "skipped": 0}
+    for result in results:
+        counts[result.status] = counts.get(result.status, 0) + 1
+    total = sum(result.duration_seconds for result in results)
+    slowest = max(results, key=lambda result: result.duration_seconds, default=None)
+    return RunRecap(counts=counts, total_seconds=total, slowest=slowest)
 
 
 class CertificationRunner:
@@ -468,7 +512,7 @@ class CertificationRunner:
         result_reason: str | None = None
         with console_log.open("w", encoding="utf-8", errors="replace") as handle:
             handle.write(f"$ {shlex.join(command)}\n\n")
-            process = subprocess.Popen(
+            with subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -478,36 +522,36 @@ class CertificationRunner:
                 bufsize=1,
                 env=ansible_subprocess_env(),
                 start_new_session=True,
-            )
-            assert process.stdout is not None
-            last_ui = 0.0
-            try:
-                for line in process.stdout:
-                    handle.write(line)
-                    stripped = line.strip()
-                    if stripped:
-                        result = RESULT_RE.search(stripped)
-                        if result and result_status is None:
-                            result_status = result.group("status")
-                            result_reason = (result.group("reason") or "").strip() or None
-                        unsupported = UNSUPPORTED_RE.search(stripped)
-                        if unsupported and unsupported_reason is None:
-                            unsupported_reason = unsupported.group("reason").strip()
-                        recap = parse_recap_line(stripped)
-                        if recap:
-                            host, stats = recap
-                            ansible_recap[host] = stats
-                        now = time.monotonic()
-                        if should_refresh_ui(last_ui, now):
-                            last_ui = now
-                            progress.update(
-                                task_id,
-                                description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
-                            )
-                return_code = process.wait()
-            except KeyboardInterrupt:
-                terminate_process_group(process)
-                raise
+            ) as process:
+                assert process.stdout is not None
+                last_ui = 0.0
+                try:
+                    for line in process.stdout:
+                        handle.write(line)
+                        stripped = line.strip()
+                        if stripped:
+                            result = RESULT_RE.search(stripped)
+                            if result and result_status is None:
+                                result_status = result.group("status")
+                                result_reason = (result.group("reason") or "").strip() or None
+                            unsupported = UNSUPPORTED_RE.search(stripped)
+                            if unsupported and unsupported_reason is None:
+                                unsupported_reason = unsupported.group("reason").strip()
+                            recap = parse_recap_line(stripped)
+                            if recap:
+                                host, stats = recap
+                                ansible_recap[host] = stats
+                            now = time.monotonic()
+                            if should_refresh_ui(last_ui, now):
+                                last_ui = now
+                                progress.update(
+                                    task_id,
+                                    description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
+                                )
+                    return_code = process.wait()
+                except KeyboardInterrupt:
+                    terminate_process_group(process)
+                    raise
 
         finished_at = utc_timestamp()
         status, status_reason = derive_status(
@@ -534,6 +578,42 @@ class CertificationRunner:
             ansible_recap=ansible_recap,
         )
 
+    def render_recap(self, results: list[StepResult]) -> None:
+        if not results:
+            return
+        recap = summarize_results(results)
+        styles = {"passed": "green", "failed": "red", "unsupported": "yellow", "skipped": "dim"}
+        table = Table(title="Run recap")
+        table.add_column("#", justify="right")
+        table.add_column("Test")
+        table.add_column("Scope")
+        table.add_column("Status")
+        table.add_column("Duration", justify="right")
+        table.add_column("rc", justify="right")
+        for result in results:
+            scope = self.options.test_scopes.get(result.test_id, "profile")
+            style = styles.get(result.status, "")
+            status_cell = f"[{style}]{result.status}[/{style}]" if style else result.status
+            return_code = "-" if result.return_code is None else str(result.return_code)
+            table.add_row(
+                f"{result.step:03d}",
+                result.display_name,
+                scope,
+                status_cell,
+                f"{result.duration_seconds:.1f}s",
+                return_code,
+            )
+        self.console.print(table)
+        counts = recap.counts
+        totals = (
+            f"[bold]{counts['passed']} passed[/bold], {counts['failed']} failed, "
+            f"{counts['unsupported']} unsupported, {counts['skipped']} skipped"
+            f" — total {recap.total_seconds:.1f}s"
+        )
+        if recap.slowest is not None:
+            totals += f", slowest {recap.slowest.display_name} {recap.slowest.duration_seconds:.1f}s"
+        self.console.print(totals)
+
     def run(self) -> int:
         tests = self.selected_tests()
         self.prepare_run_dir()
@@ -557,6 +637,7 @@ class CertificationRunner:
         finally:
             self.write_summary(results, started_at, utc_timestamp())
 
+        self.render_recap(results)
         self.console.print(
             Panel(
                 f"Sandbox:\n[bold]{self.paths.sandbox_dir}[/bold]\n\n"

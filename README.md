@@ -26,20 +26,33 @@ cd Hardware-Certification-Suite
 
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install "ansible-core>=2.17,<2.18" -r requirements-runner.txt
+pip install "ansible-core>=2.17,<2.18"
+pip install -e .
 cp hcs-runner.example.yml hcs-runner.yml
 ```
 
-Run the fast smoke test:
+`pip install -e .` pulls in the runner dependencies and adds an `hcs` command, so
+`hcs run --profile check` works as a shortcut for `python -m hcs run --profile
+check`. Both forms are equivalent; the examples below use `python -m hcs` so they
+also work without installing.
+
+Run the fast smoke test (the local host is the default target):
 
 ```bash
-python -m hcs run --profile check --inventory 127.0.0.1, -c local
+python -m hcs run --profile check
 ```
 
 Run the certification policy preset:
 
 ```bash
-python -m hcs run --preset certification --inventory 127.0.0.1, -c local
+python -m hcs run --preset certification
+```
+
+To certify a remote machine instead, add `--host <SUT IP>` and HCS runs it over
+SSH:
+
+```bash
+python -m hcs run --preset certification --host <SUT IP>
 ```
 
 For long runs, start inside `tmux` or `screen`. Run from a privileged shell
@@ -61,7 +74,7 @@ Condensed excerpt from a real two-pass `check` run on an AlmaLinux 10.2 test
 system. Host and IP values are anonymized.
 
 ```text
-$ python -m hcs run --profile check --repeat 2 --inventory 127.0.0.1, -c local
+$ python -m hcs run --profile check --repeat 2
 
          'c:.
         lkkkx, ..       ..   ,cc,
@@ -129,13 +142,18 @@ run.report.txt
 
 | Goal | Command |
 | --- | --- |
-| Fast sanity check | `python -m hcs run --profile check --inventory 127.0.0.1, -c local` |
-| Certification evidence | `python -m hcs run --preset certification --inventory 127.0.0.1, -c local` |
+| Fast sanity check | `python -m hcs run --profile check` |
+| Certification evidence | `python -m hcs run --preset certification` |
 | Preview without running tests | `python -m hcs run --preset certification --dry-run` |
 | Build a named preset | `python -m hcs configure --preset lab-default` |
 | Run selected tests | `python -m hcs run --profile medium --test cpu --test network` |
-| Remote SUT | `python -m hcs run --preset certification --inventory <SUT IP>,` |
-| Optional NVIDIA GPU Burn | `python -m hcs run --profile check --test gpu_burn --inventory 127.0.0.1, -c local` |
+| Remote SUT | `python -m hcs run --preset certification --host <SUT IP>` |
+| Optional NVIDIA GPU Burn | `python -m hcs run --profile check --test gpu_burn` |
+
+The local host is the default target, so plain commands run against it. The
+runner infers the Ansible connection from the inventory: loopback runs with the
+local connection, and `--host <SUT IP>` runs over SSH. Pass `-c <connection>`
+only to override that.
 
 Keep lab defaults in `hcs-runner.yml`. The runner auto-loads that file, so
 normal commands do not need a manual timestamp, run ID, or sandbox path.
@@ -169,8 +187,9 @@ run:
 
 `LTS` means the Local Testing Server, the host running the runner/Ansible
 controller. `SUT` means System Under Test, the host being certified. The
-simplest setup uses the same host as both LTS and SUT with
-`--inventory 127.0.0.1, -c local`.
+simplest setup uses the same host as both LTS and SUT, which is the default —
+plain commands target the local host. Add `--host <SUT IP>` to certify a
+separate machine over SSH.
 
 ## Operator Guides
 

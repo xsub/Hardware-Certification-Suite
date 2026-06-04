@@ -16,6 +16,13 @@ Keep lab-wide runner defaults in `hcs-runner.yml`. The runner loads this file
 automatically from the repository directory, so normal commands do not need a
 manual timestamp, run ID, or base directory.
 
+The local host is the default target, so the examples below omit inventory and
+connection flags. The runner infers the Ansible connection from the inventory:
+a loopback inventory (`127.0.0.1,`) runs with the local connection, and a
+remote `--host <SUT IP>` runs over SSH. Use `--inventory` / `-c` only to take
+explicit control, for example a real inventory file or a non-default
+connection plugin.
+
 List available runner profiles and test IDs:
 
 ```bash
@@ -56,7 +63,7 @@ $ python -m hcs configure --preset gpu-burn-check
 Preset name (gpu-burn-check): gpu-burn-check
 Base profile [check/short/medium/long/very_long/extreme] (check): check
 Inventory (127.0.0.1,): 127.0.0.1,
-Connection (local): local
+Connection (auto = local for loopback, SSH for a remote host) [auto/local/ssh/smart/paramiko] (auto): auto
 Repeat passes (1): 2
 
 Select tests
@@ -89,14 +96,13 @@ Saved preset excerpt:
 
 ```yaml
 run:
-  base_dir: /tmp
+  base_dir: /var/tmp
   default_preset: gpu-burn-check
 
 presets:
   gpu-burn-check:
     profile: check
     inventory: 127.0.0.1,
-    connection: local
     repeat: 2
     tests:
       hw_detection:
@@ -124,9 +130,9 @@ $ python -m hcs run --preset gpu-burn-check --dry-run
 │ Profile: check                                                               │
 │ Mode: Fast sanity pass for runner, inventory, and hardware discovery.        │
 │ Run ID: check-4f21a9c0                                                       │
-│ Sandbox: /tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0            │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0        │
 │ Runner artifacts:                                                            │
-│ /tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0/runner              │
+│ /var/tmp/AlmaLinux-HCS-20260601T131500Z-RunID-check-4f21a9c0/runner          │
 │ Inventory: 127.0.0.1,                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
              Planned certification steps
@@ -162,9 +168,9 @@ $ python -m hcs run --preset certification --dry-run
 │ Profile: long                                                                │
 │ Mode: Extended certification pass with LTP and Phoronix.                     │
 │ Run ID: long-31bda138                                                        │
-│ Sandbox: /tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138             │
+│ Sandbox: /var/tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138         │
 │ Runner artifacts:                                                            │
-│ /tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138/runner               │
+│ /var/tmp/AlmaLinux-HCS-20260601T132150Z-RunID-long-31bda138/runner           │
 │ Inventory: 127.0.0.1,                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                   Planned certification steps
@@ -193,40 +199,39 @@ Manual certification checks tracked outside the automated runner:
 Run one automated test locally through the runner:
 
 ```bash
-python -m hcs run --profile short --test cpu --inventory 127.0.0.1, -c local
+python -m hcs run --profile short --test cpu
 ```
 
 Run several selected tests locally through the runner:
 
 ```bash
 python -m hcs run --profile medium \
-  --test hw_detection --test cpu --test network \
-  --inventory 127.0.0.1, -c local
+  --test hw_detection --test cpu --test network
 ```
 
 Run all tests from a runner profile:
 
 ```bash
-python -m hcs run --profile medium --inventory 127.0.0.1, -c local
+python -m hcs run --profile medium
 ```
 
 Run the fullest built-in AlmaLinux automated profile, including LTP and
 Phoronix:
 
 ```bash
-python -m hcs run --profile extreme --inventory 127.0.0.1, -c local
+python -m hcs run --profile extreme
 ```
 
-Run the same profile against a remote SUT:
+Run the same profile against a remote SUT over SSH:
 
 ```bash
-python -m hcs run --profile extreme --inventory <SUT IP>,
+python -m hcs run --profile extreme --host <SUT IP>
 ```
 
 Repeat the selected plan and keep data from every pass:
 
 ```bash
-python -m hcs run --profile check --repeat 3 --inventory 127.0.0.1, -c local
+python -m hcs run --profile check --repeat 3
 ```
 
 Override an Ansible variable while using the runner:
@@ -240,7 +245,7 @@ This test is not part of the default profiles; it records `unsupported` when
 NVIDIA drivers are not installed.
 
 ```bash
-python -m hcs run --profile check --test gpu_burn --inventory 127.0.0.1, -c local
+python -m hcs run --profile check --test gpu_burn
 ```
 
 On AlmaLinux 9 and 10, NVIDIA driver setup is now an AlmaLinux-native package
@@ -382,13 +387,13 @@ PYTHON=python3.14
 $PYTHON -m venv venv-almalinux-certification-suite
 source venv-almalinux-certification-suite/bin/activate
 pip install "ansible-core>=2.17,<2.18"
-pip install -r requirements-runner.txt
+pip install -e .   # runner deps + the `hcs` command; or: pip install -r requirements-runner.txt
 cp hcs-runner.example.yml hcs-runner.yml
 
 # Optional for larger runs: edit hcs-runner.yml and set run.base_dir: /var/tmp
 
 tmux new-session -s almalinux-certification-tests
-python -m hcs run --profile check --inventory 127.0.0.1, -c local
+python -m hcs run --profile check
 ```
 
 ## Run Profiles
@@ -405,17 +410,21 @@ python -m hcs run --profile check --inventory 127.0.0.1, -c local
 Useful runner commands:
 
 ```bash
+python -m hcs --version
 python -m hcs profiles
 python -m hcs tests
 python -m hcs run --help
 ```
+
+`python -m hcs run` accepts `--host <SUT IP>` as shorthand for
+`--inventory <SUT IP>,`. `--host` and `--inventory` are mutually exclusive.
 
 ## Run Sandbox
 
 Each run owns one sandbox directory. By default:
 
 ```text
-/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
+/var/tmp/AlmaLinux-HCS-<UTC timestamp>-RunID-<run id>
 ```
 
 Everything created by HCS for that run belongs under that root:
@@ -491,11 +500,16 @@ Use remote mode when the controller and SUT are different machines.
 ansible all -i <SUT IP>, -m ping -u root
 ```
 
-Run a profile against the remote SUT:
+Run a profile against the remote SUT over SSH:
 
 ```bash
-python -m hcs run --profile check --inventory <SUT IP>,
+python -m hcs run --profile check --host <SUT IP>
 ```
+
+`--host <SUT IP>` is shorthand for `--inventory <SUT IP>,`; the runner infers
+the SSH connection because the inventory is not loopback. The `certification`
+preset works the same way: `python -m hcs run --preset certification --host
+<SUT IP>`.
 
 Full certification runs can take 2 to 5 days depending on the device resources.
 Use `tmux` or `screen` on the LTS so the session survives network
@@ -558,8 +572,8 @@ direct playbook use and advanced tuning.
 | --- | --- |
 | `hcs_run_id` | Run identifier used in generated sandbox names. |
 | `hcs_run_timestamp` | UTC timestamp used in generated sandbox names. |
-| `hcs_base_dir` | Base directory for generated sandboxes. Defaults to `/tmp`. |
-| `hcs_sandbox_dir` | Run sandbox root. Defaults to `/tmp/AlmaLinux-HCS-<timestamp>-RunID-<id>`. |
+| `hcs_base_dir` | Base directory for generated sandboxes. Defaults to `/var/tmp`. |
+| `hcs_sandbox_dir` | Run sandbox root. Defaults to `/var/tmp/AlmaLinux-HCS-<timestamp>-RunID-<id>`. |
 | `hcs_work_dir` | Suite work directory. Defaults to `hcs_sandbox_dir`. |
 | `hcs_scratch_dir` | Scratch directory for temporary tool output. |
 | `hcs_cache_dir` | Cache directory for reusable downloads/assets. |
@@ -573,6 +587,7 @@ direct playbook use and advanced tuning.
 | `test_network.speed` | Target network test speed in Mbps. |
 | `test_network.device` | Optional network device selector. |
 | `test_raid.duration` | RAID test duration in seconds. |
+| `ltp_version` | LTP git tag or branch to clone and build. Defaults to a recent stable LTP release. |
 | `test_ltp.suites` | LTP suite pattern. |
 | `test_ltp.log_file` | LTP full log path on the SUT. |
 | `test_phoronix.tests` | Phoronix test suite mapping. |
@@ -626,7 +641,10 @@ Guidelines for new automated tests:
 - Roles execute in the context of the SUT. Use Ansible delegation only when a
   task truly belongs on the LTS/controller.
 - Hardware-specific tests, such as RAID or USB, should be selected only when
-  the target platform has the expected devices.
+  the target platform has the expected devices. The `medium` and longer
+  profiles include `raid`; when the SUT has no MD array it records
+  `unsupported` (a warning) rather than a pass or a failure. `network` and
+  `kvm` behave the same way on a single host or without CPU virtualization.
 - Phoronix can require more than `100GB` of free space. Keep its folder inside
   the run sandbox by setting `paths.phoronix_dir` or `sandbox_dir`.
 - Passing local results should be treated as evidence for SIG review, not as a

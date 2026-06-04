@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hcs-runner"
+description = "AlmaLinux Hardware Certification Suite runner"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Pawel Suchanecki", email = "subdcc@gmail.com" }]
+dynamic = ["version"]
+dependencies = [
+    "rich>=13.7,<14",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+hcs = "hcs.__main__:main"
+
+[tool.setuptools]
+packages = ["hcs"]
+
+[tool.setuptools.dynamic]
+version = { attr = "hcs.__version__" }

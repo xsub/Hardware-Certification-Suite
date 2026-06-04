@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from hcs.config import build_sandbox_paths, load_config
+from hcs.config import build_sandbox_paths, load_config, sandbox_child
 
 
 class RunnerConfigTests(unittest.TestCase):
@@ -57,6 +57,26 @@ class RunnerConfigTests(unittest.TestCase):
         self.assertEqual(config["run"]["base_dir"], "/var/tmp")
         self.assertEqual(paths.sandbox_dir.parent, Path("/var/tmp"))
         self.assertRegex(paths.run_id, r"^check-[0-9a-f]{8}$")
+
+
+class SandboxChildTests(unittest.TestCase):
+    def test_relative_child_stays_inside_root(self) -> None:
+        root = Path("/var/tmp/AlmaLinux-HCS-run")
+        self.assertEqual(sandbox_child(root, None, "logs"), root / "logs")
+
+    def test_absolute_child_inside_root_is_allowed(self) -> None:
+        root = Path("/var/tmp/AlmaLinux-HCS-run")
+        self.assertEqual(sandbox_child(root, "/var/tmp/AlmaLinux-HCS-run/logs", "logs"), root / "logs")
+
+    def test_relative_escape_is_rejected(self) -> None:
+        root = Path("/var/tmp/AlmaLinux-HCS-run")
+        with self.assertRaises(ValueError):
+            sandbox_child(root, "../escape", "logs")
+
+    def test_absolute_outside_root_is_rejected(self) -> None:
+        root = Path("/var/tmp/AlmaLinux-HCS-run")
+        with self.assertRaises(ValueError):
+            sandbox_child(root, "/etc/passwd", "logs")
 
 
 if __name__ == "__main__":

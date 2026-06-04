@@ -28,8 +28,16 @@ from .presets import (
     preset_test_profiles,
     preset_test_scopes,
 )
+from . import __version__
 from .profiles import PROFILES, TESTS
-from .runner import CertificationRunner, RunnerOptions, parse_extra_vars, render_profiles, render_tests
+from .runner import (
+    CertificationRunner,
+    RunnerOptions,
+    default_connection,
+    parse_extra_vars,
+    render_profiles,
+    render_tests,
+)
 
 
 def positive_int(raw: str) -> int:
@@ -41,6 +49,7 @@ def positive_int(raw: str) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hcs", description="AlmaLinux Hardware Certification Suite runner")
+    parser.add_argument("--version", action="version", version=f"hcs {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("profiles", help="List built-in run profiles")
@@ -54,8 +63,14 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", type=Path, help="YAML runner config; defaults to hcs-runner.yml when present")
     run.add_argument("--preset", help="Named preset from runner config; defaults to run.default_preset when set")
     run.add_argument("--profile", choices=sorted(PROFILES))
-    run.add_argument("--inventory")
-    run.add_argument("-c", "--connection")
+    run.add_argument("--inventory", help="Ansible inventory; defaults to 127.0.0.1, (local)")
+    run.add_argument("--host", help="Shorthand for --inventory HOST, (a single remote SUT)")
+    run.add_argument(
+        "-c",
+        "--connection",
+        help="Ansible connection; inferred from the inventory when omitted "
+        "(local for loopback, SSH for a remote host)",
+    )
     run.add_argument("--playbook", type=Path, default=Path("automated.yml"))
     run.add_argument("--base-dir", type=Path, help="Base directory for generated HCS sandboxes")
     run.add_argument("--sandbox-dir", type=Path, help="Explicit sandbox root for this HCS run")
@@ -121,7 +136,11 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
         default=preset_base_profile(existing) or "check",
     )
     inventory = Prompt.ask("Inventory", default=preset_str(existing, "inventory") or "127.0.0.1,")
-    connection = Prompt.ask("Connection", default=preset_str(existing, "connection") or "local")
+    connection = Prompt.ask(
+        "Connection (auto = local for loopback, SSH for a remote host)",
+        choices=["auto", "local", "ssh", "smart", "paramiko"],
+        default=preset_str(existing, "connection") or "auto",
+    )
     repeat = IntPrompt.ask("Repeat passes", default=preset_positive_int(existing, "repeat") or 1)
 
     console.print()
@@ -176,13 +195,16 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
 
         selected_tests[test_id] = entry
 
-    preset = {
+    preset: dict[str, object] = {
         "profile": base_profile,
         "inventory": inventory,
-        "connection": connection,
-        "repeat": repeat,
-        "tests": selected_tests,
     }
+    # "auto" defers to inventory-based inference at run time, so only persist an
+    # explicit connection when the operator pins one.
+    if connection != "auto":
+        preset["connection"] = connection
+    preset["repeat"] = repeat
+    preset["tests"] = selected_tests
     run_config = config.setdefault("run", {})
     if not isinstance(run_config, dict):
         console.print("[red]Cannot update config:[/red] run section must be a mapping")
@@ -216,13 +238,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "configure":
         return configure_preset(args, console)
     if args.command == "run":
+        if args.host and args.inventory:
+            parser.error("--host and --inventory are mutually exclusive")
         try:
             config = load_config(args.config)
             preset_name = args.preset or (None if args.profile else config_default_preset(config))
             preset = get_preset(config, preset_name)
             profile = args.profile or preset_base_profile(preset) or "check"
-            inventory = args.inventory or preset_str(preset, "inventory") or "127.0.0.1,"
-            connection = args.connection if args.connection is not None else (preset_str(preset, "connection") or "local")
+            host_inventory = f"{args.host}," if args.host else None
+            inventory = args.inventory or host_inventory or preset_str(preset, "inventory") or "127.0.0.1,"
+            explicit_connection = (
+                args.connection if args.connection is not None else preset_str(preset, "connection")
+            )
+            connection = explicit_connection if explicit_connection is not None else default_connection(inventory)
             repeat = args.repeat or preset_positive_int(preset, "repeat") or 1
             config_vars = config_extra_vars(config)
             preset_vars = preset_extra_vars(preset)
