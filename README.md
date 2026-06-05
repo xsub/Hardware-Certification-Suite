@@ -15,7 +15,9 @@ behind the
 It exercises a system's hardware on AlmaLinux and produces repeatable evidence
 that the AlmaLinux Certification SIG reviews to grant official certification.
 
-📄 **See a sample:** [a rendered Hardware Certification report (PDF)](docs/sample-report.pdf) produced by the runner.
+**Sample report** — the runner produces a branded `run.report.pdf`; preview below (cover + results), or [download the full PDF](https://github.com/xsub/Hardware-Certification-Suite/raw/main/docs/sample-report.pdf):
+
+![Sample AlmaLinux Hardware Certification report — cover and results page](docs/sample-report.png)
 
 ## AlmaLinux Hardware Certification
 
