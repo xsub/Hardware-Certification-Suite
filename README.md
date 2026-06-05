@@ -140,9 +140,8 @@ PASS 002 pass=02/02 Hardware detection
 │ Runner artifacts:                                                        │
 │ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner      │
 ╰──────────────────────────────────────────────────────────────────────────╯
-
-The runner also writes run.report.txt and run.summary.json into the sandbox.
 ```
+The runner also writes run.report.txt and run.summary.json into the sandbox.
 
 ## Choose A Run
 
