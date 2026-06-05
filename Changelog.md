@@ -1,7 +1,15 @@
 # Changelog
 
-## 2026-06-05 - version 0.2.0, packaging CI, README refresh
+## 2026-06-05 - branded PDF report, version 0.2.0, packaging CI, README refresh
 
+- Added a branded `run.report.pdf` certification report rendered with reportlab
+  and styled per the official AlmaLinux OS Brand Book (Science Blue / Atlantis /
+  Candlelight palette, Montserrat, the AlmaLinux logo and "Powered by AlmaLinux"
+  lockup). It has a cover with the overall status and run metadata, a controller
+  system table, and a colour-coded per-test results table. The runner writes it
+  next to `run.report.txt` / `run.summary.json`; it is best-effort and never
+  fails a run. Added `reportlab` as a dependency and bundled the Montserrat (OFL)
+  fonts and logo assets under `hcs/assets/`.
 - Lowered the supported floor to Python `3.9` so the runner works on AlmaLinux
   9's platform Python without a newer interpreter: replaced the 3.11-only
   `datetime.UTC` with `datetime.timezone.utc`, set `requires-python = ">=3.9"`,

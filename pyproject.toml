@@ -12,6 +12,7 @@ dynamic = ["version"]
 dependencies = [
     "rich>=13.7,<14",
     "PyYAML>=6.0",
+    "reportlab>=4,<5",
 ]
 
 [project.scripts]
@@ -19,6 +20,9 @@ hcs = "hcs.__main__:main"
 
 [tool.setuptools]
 packages = ["hcs"]
+
+[tool.setuptools.package-data]
+hcs = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/branding/*.png"]
 
 [tool.setuptools.dynamic]
 version = { attr = "hcs.__version__" }

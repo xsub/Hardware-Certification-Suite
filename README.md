@@ -15,6 +15,8 @@ behind the
 It exercises a system's hardware on AlmaLinux and produces repeatable evidence
 that the AlmaLinux Certification SIG reviews to grant official certification.
 
+📄 **See a sample:** [a rendered Hardware Certification report (PDF)](docs/sample-report.pdf) produced by the runner.
+
 ## AlmaLinux Hardware Certification
 
 The program ensures hardware compatibility with AlmaLinux and promotes OS
@@ -75,9 +77,9 @@ cp hcs-runner.example.yml hcs-runner.yml
 
 The suite ships a Python/Rich runner (`hcs`) — the recommended way to produce
 certification evidence. It plans the work, streams progress, keeps every
-artifact in one per-run sandbox, and writes the plain-text and JSON reports the
-SIG reviews. `pip install -e .` adds the `hcs` command; `python -m hcs` works
-without installing.
+artifact in one per-run sandbox, and writes a branded PDF plus plain-text and
+JSON reports for SIG review. `pip install -e .` adds the `hcs` command;
+`python -m hcs` works without installing.
 
 ```bash
 # fast smoke test (the local host is the default target)
@@ -101,7 +103,7 @@ selected tests need package installation or direct hardware access.
 | Certification preset | The built-in `certification` preset separates required automated checks, optional hardware-dependent checks, and manual checks. |
 | Sandboxed evidence | Each run gets one `AlmaLinux-HCS-<timestamp>-RunID-<id>` directory with consistent report, log, and artifact names. |
 | Repeatable burn-in | Profiles from `check` through `extreme`, repeated passes, named presets, and per-test duration/profile controls. |
-| Plain-text first reports | `run.report.txt` is readable by engineers; JSON summaries sit next to it for automation. |
+| Reports for review | A branded `run.report.pdf` in official AlmaLinux styling, plus `run.report.txt` for engineers and `run.summary.json` for automation. |
 
 ### Console Preview
 
@@ -175,7 +177,7 @@ PASS 002 pass=02/02 Hardware detection
 │ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner      │
 ╰──────────────────────────────────────────────────────────────────────────╯
 ```
-The runner also writes run.report.txt and run.summary.json into the sandbox.
+The runner also writes run.report.pdf, run.report.txt, and run.summary.json into the sandbox.
 
 ### Choosing a Run
 

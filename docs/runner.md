@@ -508,6 +508,7 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` | Structured result for one step. |
 | `run.summary.json` | Machine-readable summary for the run. |
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
+| `run.report.pdf` | Branded PDF report (official AlmaLinux styling) for review and submission. Skipped only if `reportlab` is unavailable. |
 
 ## Remote LTS/SUT
 

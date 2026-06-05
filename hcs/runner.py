@@ -419,6 +419,57 @@ class CertificationRunner:
             encoding="utf-8",
         )
         self.write_text_report(results, status, started_at, finished_at)
+        self.write_pdf_report(results, status, started_at, finished_at)
+
+    def write_pdf_report(
+        self,
+        results: list[StepResult],
+        status: str,
+        started_at: str,
+        finished_at: str,
+    ) -> None:
+        """Write the branded PDF report; never let it break a run."""
+        try:
+            from .report_pdf import write_pdf_report as render_pdf
+        except Exception:
+            return
+        recap = summarize_results(results)
+        result_dicts = [
+            {
+                "step": result.step,
+                "test_id": result.test_id,
+                "display_name": result.display_name,
+                "scope": self.options.test_scopes.get(result.test_id, "profile"),
+                "status": result.status,
+                "status_reason": result.status_reason,
+                "return_code": result.return_code,
+                "duration_seconds": result.duration_seconds,
+            }
+            for result in results
+        ]
+        try:
+            written = render_pdf(
+                self.run_dir / "run.report.pdf",
+                run_id=self.paths.run_id,
+                profile=self.profile.name,
+                preset_name=self.options.preset_name,
+                repeat=self.options.repeat,
+                status=status,
+                started_at=started_at,
+                finished_at=finished_at,
+                generated_at=utc_timestamp(),
+                system_title=self.system_summary.title,
+                system_facts=[(fact.label, fact.value) for fact in self.system_summary.facts],
+                results=result_dicts,
+                counts=recap.counts,
+                total_seconds=recap.total_seconds,
+                version=__version__,
+            )
+        except Exception as exc:  # never fail the run over a report
+            self.console.print(f"[yellow]PDF report skipped:[/yellow] {exc}")
+            return
+        if not written:
+            self.console.print("[dim]PDF report skipped: reportlab not installed.[/dim]")
 
     def write_text_report(
         self,
