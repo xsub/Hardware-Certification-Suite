@@ -4,6 +4,7 @@
 [![Python 3.9+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
+
 [![AlmaLinux 10 validated](https://img.shields.io/badge/AlmaLinux%209%20%7C%2010-validated-1a3a63?logo=almalinux&logoColor=white)](docs/runner.md#compatibility)
 [![ansible-core](https://img.shields.io/badge/ansible--core-2.17-1a1a1a?logo=ansible&logoColor=white)](https://github.com/ansible/ansible)
 [![Certification SIG](https://img.shields.io/badge/AlmaLinux-Certification%20SIG-1a3a63?logo=almalinux&logoColor=white)](https://wiki.almalinux.org/sigs/Certification)
