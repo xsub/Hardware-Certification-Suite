@@ -6,17 +6,55 @@
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 [![AlmaLinux 10 validated](https://img.shields.io/badge/AlmaLinux%209%20%7C%2010-validated-1a3a63?logo=almalinux&logoColor=white)](docs/runner.md#compatibility)
 
-Turn a fresh AlmaLinux system into repeatable hardware certification evidence.
-HCS wraps the existing Ansible test suite with a Python/Rich runner that plans
-the work, streams progress, keeps every artifact in one sandbox, and produces
-plain-text plus JSON reports for review.
+The AlmaLinux Hardware Certification Suite (HCS) is the open-source toolset
+behind the
+[AlmaLinux Hardware Certification Program](https://almalinux.org/certification/hardware-certification/).
+It exercises a system's hardware on AlmaLinux and produces repeatable evidence
+that the AlmaLinux Certification SIG reviews to grant official certification.
 
-HCS creates certification evidence. Official certification status is granted
-through the
-[AlmaLinux Hardware Certification Program](https://almalinux.org/certification/hardware-certification/)
-after review by the Certification SIG.
+## AlmaLinux Hardware Certification
 
-## Start Here
+The program ensures hardware compatibility with AlmaLinux and promotes OS
+adoption, with a focus on long-term reliability and performance. Hardware
+compatibility issues can lead to system instability or performance degradation,
+so vendors use certification to demonstrate that their hardware runs AlmaLinux
+reliably, and users get a public, vetted catalog of certified systems.
+
+HCS is how that hardware is exercised and evidenced:
+
+| Step | Where it happens |
+| --- | --- |
+| Validate the hardware | Run HCS on the system under test to produce certification evidence. |
+| Submit results | Open a request in [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications) with the evidence. |
+| SIG review | The Certification SIG reviews the submission and grants official status. |
+| Publish | Certified hardware is listed in the [Ecosystem Catalog](https://almalinux.org/certification/ecosystem-catalog/). |
+
+A passing local run is **evidence for SIG review, not a self-issued
+certification**. The program is managed by the
+[AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification).
+
+## What the Suite Tests
+
+HCS covers the certification testing areas as Ansible-driven tests — automated
+where possible, interactive where physical interaction is required:
+
+| Testing area | HCS test |
+| --- | --- |
+| Hardware detection and inventory | `hw_detection` (DMI / PCI / storage / network report) |
+| CPU stress | `cpu` (stress-ng) |
+| Containerization | `containers` (podman) |
+| KVM / virtualization | `kvm` |
+| Network performance | `network` (iperf3 across the link) |
+| Linux kernel testing | `ltp` (Linux Test Project) |
+| OS and feature benchmarking | `phoronix` (Phoronix Test Suite) |
+| USB port functionality | `interactive.yml` — `tests/usb/` |
+| PXE device booting | `interactive.yml` — `tests/pxe/` |
+| GPU / accelerator readiness | optional `gpu_burn` (NVIDIA) |
+
+These tests are the substance of a certification run. To make running and
+collecting them repeatable, the suite also ships a guided runner, shown next.
+
+## Running the Suite
 
 On a fresh AlmaLinux 10 system, install once:
 
@@ -32,36 +70,29 @@ pip install -e .
 cp hcs-runner.example.yml hcs-runner.yml
 ```
 
-`pip install -e .` pulls in the runner dependencies and adds an `hcs` command, so
-`hcs run --profile check` works as a shortcut for `python -m hcs run --profile
-check`. Both forms are equivalent; the examples below use `python -m hcs` so they
-also work without installing.
-
-Run the fast smoke test (the local host is the default target):
+The suite ships a Python/Rich runner (`hcs`) — the recommended way to produce
+certification evidence. It plans the work, streams progress, keeps every
+artifact in one per-run sandbox, and writes the plain-text and JSON reports the
+SIG reviews. `pip install -e .` adds the `hcs` command; `python -m hcs` works
+without installing.
 
 ```bash
+# fast smoke test (the local host is the default target)
 python -m hcs run --profile check
-```
 
-Run the certification policy preset:
-
-```bash
+# the certification policy preset (required automated checks)
 python -m hcs run --preset certification
-```
 
-To certify a remote machine instead, add `--host <SUT IP>` and HCS runs it over
-SSH:
-
-```bash
+# certify a separate machine over SSH
 python -m hcs run --preset certification --host <SUT IP>
 ```
 
-For long runs, start inside `tmux` or `screen`. Run from a privileged shell
-when selected tests need package installation or direct hardware access.
+For long runs, start inside `tmux` or `screen`, from a privileged shell when
+selected tests need package installation or direct hardware access.
 
-## The Promise
+### What the Runner Provides
 
-| HCS Features | Provides / Value |
+| Runner feature | Provides / Value |
 | --- | --- |
 | Guided Rich console runner | Operators see the plan, current step, pass counters, and final result without reading raw Ansible output first. |
 | Certification preset | The built-in `certification` preset separates required automated checks, optional hardware-dependent checks, and manual checks. |
@@ -69,7 +100,7 @@ when selected tests need package installation or direct hardware access.
 | Repeatable burn-in | Profiles from `check` through `extreme`, repeated passes, named presets, and per-test duration/profile controls. |
 | Plain-text first reports | `run.report.txt` is readable by engineers; JSON summaries sit next to it for automation. |
 
-## Console Preview
+### Console Preview
 
 Condensed excerpt from a real two-pass `check` run on an AlmaLinux 10.2 test
 system. Host and IP values are anonymized.
@@ -143,7 +174,7 @@ PASS 002 pass=02/02 Hardware detection
 ```
 The runner also writes run.report.txt and run.summary.json into the sandbox.
 
-## Choose A Run
+### Choosing a Run
 
 | Goal | Command |
 | --- | --- |
@@ -169,15 +200,25 @@ run:
   default_preset: certification
 ```
 
-## Certification Flow
+## Running Tests Directly With Ansible
 
-| Step | Where it happens |
-| --- | --- |
-| Prepare the system | Install AlmaLinux, update it, and install the runner prerequisites. |
-| Run HCS | Start with `check`, then run `--preset certification` for ordinary automated certification evidence. |
-| Review artifacts | Inspect `run.report.txt`, `run.summary.json`, per-step logs, and collected artifacts in the sandbox. |
-| Submit results | Follow the official program flow and share accepted results through [AlmaLinux/certifications](https://github.com/AlmaLinux/certifications). |
-| Publish status | Final status is published through the [Ecosystem Catalog](https://almalinux.org/certification/ecosystem-catalog/) after SIG review. |
+For low-level debugging, or when you do not need the runner's reports, run the
+Ansible playbooks directly. Direct runs use the same sandbox variables but do
+not produce the runner's JSON summaries, repeated-pass reports, or Rich output.
+
+```bash
+# one automated test, locally
+ansible-playbook -c local -i 127.0.0.1, automated.yml --tags cpu
+
+# the same against a remote SUT
+ansible-playbook -i <SUT IP>, -u root automated.yml --tags cpu
+
+# interactive USB / PXE tests
+ansible-playbook -i <SUT IP>, -u root interactive.yml
+```
+
+The [operator reference](docs/runner.md) documents the full command set,
+profiles, presets, sandbox layout, variables, and how to add tests.
 
 ## Requirements
 
@@ -208,14 +249,12 @@ separate machine over SSH.
 
 ## Project Scope
 
-HCS is AlmaLinux-first, but the runner patterns are intentionally useful for
-other Linux hardware validation work: predictable sandboxes, repeatable
-profiles, plain-text reports, machine-readable JSON, and optional long-running
-burn-in workflows.
+HCS is AlmaLinux-first: it implements the AlmaLinux Hardware Certification
+Program's testing areas and produces the evidence the Certification SIG reviews.
+This repository corrects and extends that suite — the guided runner, sandboxed
+evidence, result contracts, and AlmaLinux 9/10 test hardening — on top of the
+AlmaLinux baseline.
 
-Passing local results should be treated as evidence for SIG review, not as a
-self-issued certification. Results intended for public certification should be
-submitted through the official AlmaLinux certification process.
-
-This repository is managed by the
-[AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification).
+The runner's patterns (predictable sandboxes, repeatable profiles, plain-text
+and JSON reports, optional long-running burn-in) are reusable for other Linux
+hardware validation too, but the suite's purpose is AlmaLinux certification.
