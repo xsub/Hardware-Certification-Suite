@@ -15,10 +15,6 @@ behind the
 It exercises a system's hardware on AlmaLinux and produces repeatable evidence
 that the AlmaLinux Certification SIG reviews to grant official certification.
 
-**Sample report** — the runner produces a branded `run.report.pdf`; preview below (cover + results), or [download the full PDF](https://github.com/xsub/Hardware-Certification-Suite/raw/main/docs/sample-report.pdf):
-
-![Sample AlmaLinux Hardware Certification report — cover and results page](docs/sample-report.png)
-
 ## AlmaLinux Hardware Certification
 
 The program ensures hardware compatibility with AlmaLinux and promotes OS
@@ -39,6 +35,10 @@ HCS is how that hardware is exercised and evidenced:
 A passing local run is **evidence for SIG review, not a self-issued
 certification**. The program is managed by the
 [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification).
+
+**Sample report** — the runner produces a branded `run.report.pdf`; preview below (cover + results), or [download the full PDF](https://github.com/xsub/Hardware-Certification-Suite/raw/main/docs/sample-report.pdf):
+
+![Sample AlmaLinux Hardware Certification report — cover and results page](docs/sample-report.png)
 
 ## What the Suite Tests
 
