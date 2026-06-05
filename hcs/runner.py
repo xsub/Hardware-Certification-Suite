@@ -13,7 +13,7 @@ import subprocess
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from rich.columns import Columns
 from rich.console import Console
@@ -128,7 +128,7 @@ class StepResult:
 
 
 def utc_timestamp() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def parse_extra_vars(values: list[str]) -> dict[str, str]:

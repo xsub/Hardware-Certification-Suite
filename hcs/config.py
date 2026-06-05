@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 import uuid
@@ -96,7 +96,7 @@ def config_extra_vars(config: dict[str, object]) -> dict[str, str]:
 
 
 def utc_path_timestamp() -> str:
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def sanitize_run_id(raw: str) -> str:
