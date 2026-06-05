@@ -1,4 +1,4 @@
-name: Python 3.11+
+name: Python 3.9+
 
 on:
   push:
@@ -16,6 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
+          - "3.9"
+          - "3.10"
           - "3.11"
           - "3.12"
           - "3.14"
@@ -29,10 +31,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install runner dependencies
+      - name: Install runner package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-runner.txt
+          python -m pip install -e .
 
       - name: Compile runner package
         run: python -m compileall hcs
@@ -40,10 +42,11 @@ jobs:
       - name: Run Python unit tests
         run: python -m unittest discover -s tests -p 'test_*.py'
 
-      - name: Render runner profile tables
+      - name: Verify the hcs console script
         run: |
-          python -m hcs profiles
-          python -m hcs tests
+          hcs --version
+          hcs profiles
+          hcs tests
 
       - name: Configure runner sandbox
         run: |
@@ -52,9 +55,9 @@ jobs:
             base_dir: ${RUNNER_TEMP}
           EOF
 
-      - name: Dry-run check profile
+      - name: Dry-run check profile via console script
         run: |
-          python -m hcs run \
+          hcs run \
             --profile check \
             --repeat 2 \
             --dry-run

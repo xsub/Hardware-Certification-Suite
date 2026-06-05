@@ -1,7 +1,7 @@
 # AlmaLinux Hardware Certification Suite
 
 [![CI](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ci.yml)
-[![Python 3.11+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
+[![Python 3.9+](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/python.yml)
 [![Ansible](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/ansible.yml)
 [![AlmaLinux](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/xsub/Hardware-Certification-Suite/actions/workflows/build.yml)
 [![AlmaLinux 10 validated](https://img.shields.io/badge/AlmaLinux%209%20%7C%2010-validated-1a3a63?logo=almalinux&logoColor=white)](docs/runner.md#compatibility)
@@ -22,7 +22,7 @@ On a fresh AlmaLinux 10 system, install once:
 
 ```bash
 dnf -y install git tmux python3.12
-git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
+git clone https://github.com/xsub/Hardware-Certification-Suite.git
 cd Hardware-Certification-Suite
 
 python3.12 -m venv .venv
@@ -123,20 +123,25 @@ almalinux@almalinux-sut.example
 Repeat: 2 passes, 2 total steps
 
 PASS 001 pass=01/02 Hardware detection
-  recap 127.0.0.1: ok=8 changed=4 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 68.2s
-  artifact tests/001-pass01-hw_detection/001-pass01-hw_detection.console.log
-
 PASS 002 pass=02/02 Hardware detection
-  recap 127.0.0.1: ok=8 changed=3 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
-  duration 75.0s
-  artifact tests/002-pass02-hw_detection/002-pass02-hw_detection.console.log
 
-run.report.txt
-  Status: passed
-  Results:
-    001 pass=01/02 hw_detection  profile  passed  68.2s rc=0 ok
-    002 pass=02/02 hw_detection  profile  passed  75.0s rc=0 ok
+                       Run recap
+┏━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━┓
+┃   # ┃ Test               ┃ Scope   ┃ Status ┃ Duration ┃ rc ┃
+┡━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━┩
+│ 001 │ Hardware detection │ profile │ passed │    68.2s │  0 │
+│ 002 │ Hardware detection │ profile │ passed │    75.0s │  0 │
+└─────┴────────────────────┴─────────┴────────┴──────────┴────┘
+2 passed, 0 failed, 0 unsupported, 0 skipped — total 143.2s, slowest Hardware detection 75.0s
+╭───────────────────────────── Run complete ──────────────────────────────╮
+│ Sandbox:                                                                 │
+│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5             │
+│                                                                          │
+│ Runner artifacts:                                                        │
+│ /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5/runner      │
+╰──────────────────────────────────────────────────────────────────────────╯
+
+The runner also writes run.report.txt and run.summary.json into the sandbox.
 ```
 
 ## Choose A Run
@@ -180,7 +185,7 @@ run:
 | Requirement | Notes |
 | --- | --- |
 | AlmaLinux SUT | Prefer a blank, freshly installed and updated AlmaLinux system. Validated on AlmaLinux 10.2; CI covers AlmaLinux 8/9/10. See [Compatibility](docs/runner.md#compatibility). |
-| Python | `3.11+` for the Rich runner. AlmaLinux 10 includes Python `3.12`; CI validates Python `3.11`, `3.12`, and `3.14`. |
+| Python | `3.9+` for the Rich runner — runs on AlmaLinux 9's platform Python `3.9` and AlmaLinux 10's `3.12`. CI validates Python `3.9`, `3.10`, `3.11`, `3.12`, and `3.14`. |
 | Ansible | `ansible-core>=2.17,<2.18` is the tested range. |
 | Tools | `git`, `tmux` or `screen`, and shell access. |
 | Optional snapd | Used only when a preset allows installing the `gpu-burn` snap workload. |

@@ -22,8 +22,9 @@ designed:
 
 CI additionally smoke-tests the runner and Ansible syntax on AlmaLinux 8, 9, and
 10, and runs the `check` profile plus the single-host `network` path
-functionally on AlmaLinux 9 and 10. Python `3.11+` is required; AlmaLinux 10
-ships Python `3.12`.
+functionally on AlmaLinux 9 and 10. Python `3.9+` is required, so the runner
+works on AlmaLinux 9's platform Python `3.9` and AlmaLinux 10's `3.12` without
+installing a newer interpreter.
 
 ## Running Tests
 
@@ -399,7 +400,7 @@ dnf -y install dnf-plugins-core
 dnf config-manager --set-enabled crb
 dnf -y install python3.14 python3.14-pip
 
-git clone https://github.com/AlmaLinux/Hardware-Certification-Suite.git
+git clone https://github.com/xsub/Hardware-Certification-Suite.git
 cd Hardware-Certification-Suite
 
 # Use python3.12 if you prefer the platform Python.

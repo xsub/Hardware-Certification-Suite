@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-05 - version 0.2.0, packaging CI, README refresh
+
+- Lowered the supported floor to Python `3.9` so the runner works on AlmaLinux
+  9's platform Python without a newer interpreter: replaced the 3.11-only
+  `datetime.UTC` with `datetime.timezone.utc`, set `requires-python = ">=3.9"`,
+  and added Python `3.9`/`3.10` to the CI matrix. Verified on Python 3.9.25 in
+  an AlmaLinux 9 container (59 unit tests + runner dry-run). This also fixes the
+  AlmaLinux 9 functional CI run, which crashed on `import UTC`.
+- Bumped the runner version to `0.2.0`.
+- The Python CI workflow now installs the package with `pip install -e .` and
+  verifies the `hcs` console script (`--version`, `profiles`, `tests`, and the
+  dry-run) on top of the unit tests it already runs, so the new packaging path
+  is covered.
+- Refreshed the README console preview to match current runner output — single
+  `PASS` lines, the `Run recap` table, and the `Run complete` panel — replacing
+  the retired per-step recap/duration/artifact lines and `run.report.txt` tail.
+
 ## 2026-06-04 - connection inference and role result contract
 
 ### Runner and user experience
