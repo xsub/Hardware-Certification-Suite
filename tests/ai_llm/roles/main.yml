@@ -1,0 +1,78 @@
+---
+
+- name: AI inference - create artifact directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ test_ai_llm['log_file'] | dirname }}"
+    - "{{ test_ai_llm['result_file'] | dirname }}"
+    - "{{ test_ai_llm['bench_json_file'] | dirname }}"
+    - "{{ test_ai_llm['source_dir'] | dirname }}"
+    - "{{ test_ai_llm['model_dir'] }}"
+
+- name: AI inference - install build dependencies
+  become: true
+  ansible.builtin.yum:
+    name:
+      - git
+      - cmake
+      - gcc-c++
+      - make
+    state: present
+  register: ai_llm_build_pkgs
+
+- name: AI inference - run test
+  ansible.builtin.shell: "{{ sut_tests_dir }}/ai_llm/run_test.sh"
+  environment:
+    HCS_AI_LLM_REPETITIONS: "{{ test_ai_llm['repetitions'] }}"
+    HCS_AI_LLM_PROMPT_TOKENS: "{{ test_ai_llm['prompt_tokens'] }}"
+    HCS_AI_LLM_GEN_TOKENS: "{{ test_ai_llm['gen_tokens'] }}"
+    HCS_AI_LLM_THREADS: "{{ test_ai_llm['threads'] }}"
+    HCS_AI_LLM_BACKEND: "{{ test_ai_llm['backend'] }}"
+    HCS_AI_LLM_GPU_LAYERS: "{{ test_ai_llm['gpu_layers'] }}"
+    HCS_AI_LLM_CMAKE_EXTRA: "{{ test_ai_llm['cmake_extra'] }}"
+    HCS_AI_LLM_MODEL: "{{ test_ai_llm['model'] }}"
+    HCS_AI_LLM_MODEL_URL: "{{ test_ai_llm['model_url'] }}"
+    HCS_AI_LLM_MODEL_DIR: "{{ test_ai_llm['model_dir'] }}"
+    HCS_AI_LLM_DOWNLOAD_MODEL: "{{ test_ai_llm['download_model'] }}"
+    HCS_AI_LLM_SOURCE_URL: "{{ test_ai_llm['source_url'] }}"
+    HCS_AI_LLM_SOURCE_REF: "{{ test_ai_llm['source_ref'] }}"
+    HCS_AI_LLM_SOURCE_DIR: "{{ test_ai_llm['source_dir'] }}"
+    HCS_AI_LLM_BINARY: "{{ test_ai_llm['binary'] }}"
+    HCS_AI_LLM_BUILD_FROM_SOURCE: "{{ test_ai_llm['build_from_source'] }}"
+    HCS_AI_LLM_LOG_FILE: "{{ test_ai_llm['log_file'] }}"
+    HCS_AI_LLM_RESULT_FILE: "{{ test_ai_llm['result_file'] }}"
+    HCS_AI_LLM_BENCH_JSON_FILE: "{{ test_ai_llm['bench_json_file'] }}"
+  register: output
+
+- name: AI inference - collect unsupported marker
+  ansible.builtin.set_fact:
+    hcs_ai_llm_unsupported: "{{ output.stdout_lines | select('match', '^HCS_UNSUPPORTED:') | list | first | default('') }}"
+
+- name: AI inference - report unsupported status to runner
+  ansible.builtin.debug:
+    msg: "{{ hcs_ai_llm_unsupported }}"
+  when: hcs_ai_llm_unsupported | length > 0
+
+- name: AI inference - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail ai_llm run_test.sh exited rc={{ output.rc }}"
+  when: hcs_ai_llm_unsupported | length == 0 and output.rc | default(0) != 0
+
+- name: AI inference - copy console log
+  ansible.builtin.copy:
+    content: "{{ output.stdout }}"
+    dest: "{{ lts_logs_dir }}/ai_llm.log"
+    mode: "0644"
+  delegate_to: localhost
+
+- name: AI inference - uninstall build dependencies HCS installed
+  become: true
+  ansible.builtin.yum:
+    name:
+      - cmake
+      - gcc-c++
+    state: absent
+  when: ai_llm_build_pkgs.changed

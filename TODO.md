@@ -28,3 +28,25 @@
 - [ ] Give the Phoronix role an explicit `HCS_RESULT` / `HCS_UNSUPPORTED` marker
   so an insufficient-disk-space outcome reads clearly in the report instead of
   the generic "recap reported ignored tasks".
+
+## AI benchmarking (future work)
+
+The `ai_llm` test (llama.cpp `llama-bench`, CPU/GPU) covers AI inference
+throughput. Two further AI-benchmark approaches are deferred:
+
+- [ ] **Extend the `phoronix` test with the `pts/machine-learning` profiles**
+  (e.g. `pts/numpy`, `pts/onnx`, `pts/ncnn`, `pts/openvino`,
+  `pts/tensorflow-lite`, `pts/llama-cpp`). Lowest effort — reuses the existing
+  Phoronix integration and its PDF/JSON reporting — but these profiles pull
+  heavy build/runtime dependencies and large datasets, so gate them behind the
+  existing disk-space check (and likely a separate, opt-in profile/test id so a
+  normal Phoronix run stays lean). Validate the EL10 dependency names like the
+  current Phoronix profiles required.
+- [ ] **Wire MLPerf Inference (MLCommons) as an authoritative tier**, driven by
+  the `mlcflow` automation (MLPerf Inference v6.0, April 2026). This is the
+  industry-standard, vendor-neutral metric and aligns with the Certification SIG
+  review framing, but it is heavy: large models/datasets, long runs, and network
+  setup. Best modelled as an optional datacenter/extreme-tier test rather than a
+  default, with graceful `HCS_UNSUPPORTED` when prerequisites or accelerators are
+  absent. References: https://mlcommons.org/working-groups/benchmarks/inference/
+  and https://github.com/mlcommons/inference.

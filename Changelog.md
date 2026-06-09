@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-09 - AI inference test (llama.cpp)
+
+- Added an optional `ai_llm` runner/Ansible test that benchmarks AI inference
+  with llama.cpp's `llama-bench`. The CPU path runs on any SUT; CUDA/Vulkan/HIP
+  GPU backends are opt-in and build only when their toolchain is present
+  (`auto` selects CUDA when `nvcc`+`nvidia-smi` exist, otherwise CPU). It reports
+  prompt-processing and token-generation throughput (tokens/sec) and writes a
+  JSON result plus the raw `llama-bench` JSON to the run artifacts directory.
+- The test downloads a small Apache-2.0 GGUF model (Qwen2.5-0.5B-Instruct
+  Q4_K_M, ~491 MB) by default; point `ai_llm_model` at a local GGUF for
+  air-gapped runs. When no model can be obtained it emits `HCS_UNSUPPORTED` and
+  the runner records the step as unsupported instead of failing the machine.
+- Registered `ai_llm` in the test registry and in every profile
+  (`ai_llm_repetitions` scales the work per profile), and added it as an
+  optional, opt-in test in the `certification` preset.
+
 ## 2026-06-05 - branded PDF report, version 0.2.0, packaging CI, README refresh
 
 - Added a branded `run.report.pdf` certification report rendered with reportlab

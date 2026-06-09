@@ -57,6 +57,7 @@ where possible, interactive where physical interaction is required:
 | USB port functionality | `interactive.yml` — `tests/usb/` |
 | PXE device booting | `interactive.yml` — `tests/pxe/` |
 | GPU / accelerator readiness | optional `gpu_burn` (NVIDIA) |
+| AI inference benchmarking | optional `ai_llm` (llama.cpp, CPU/GPU) |
 
 These tests are the substance of a certification run. To make running and
 collecting them repeatable, the suite also ships a guided runner, shown next.

@@ -12,7 +12,7 @@
 
     # GENERAL SETUP
     - name: Create LTS logs dir
-      tags: [logs_folder, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, cllimits]
+      tags: [logs_folder, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, ai_llm, cllimits]
       block:
         - name: Create LTS logs dir
           ansible.builtin.file:
@@ -22,7 +22,7 @@
           delegate_to: localhost
 
     - name: Create SUT work dirs
-      tags: [logs_folder, tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, cllimits]
+      tags: [logs_folder, tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, ai_llm, cllimits]
       block:
         - name: Create SUT work dirs
           ansible.builtin.file:
@@ -36,7 +36,7 @@
             - "{{ hcs_artifacts_dir }}"
 
     - name: Copy tests
-      tags: [tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, cllimits]
+      tags: [tests_copy, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, ai_llm, cllimits]
       block:
         - name: Copy tests
           ansible.builtin.copy:
@@ -116,6 +116,13 @@
         - name: GPU Burn
           ansible.builtin.include_tasks: "{{ lts_tests_dir }}/gpu_burn/roles/main.yml"
 
+    # AI INFERENCE (llama.cpp)
+    - name: AI inference
+      tags: ['never', 'ai_llm']
+      block:
+        - name: AI inference
+          ansible.builtin.include_tasks: "{{ lts_tests_dir }}/ai_llm/roles/main.yml"
+
     # lve limits/cagefs
     - name: CL limits
       tags: cllimits
@@ -128,7 +135,7 @@
 
     # GENERAL CLEANUP
     - name: Cleanup
-      tags: [tests_cleanup, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, cllimits]
+      tags: [tests_cleanup, containers, cpu, hw_detection, kvm, network, raid, ltp, phoronix, gpu_burn, ai_llm, cllimits]
       block:
         - name: Remove tests
           ansible.builtin.file:

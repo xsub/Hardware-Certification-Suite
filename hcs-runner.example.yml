@@ -97,6 +97,11 @@ presets:
           package: gpu-burn
           install: false
           remove_after: true
+      ai_llm:
+        enabled: false
+        required: false
+        profile: medium
+        reason: Optional AI inference benchmark (llama.cpp); enable to record tokens/sec evidence on CPU or GPU.
       cllimits:
         enabled: false
         required: false

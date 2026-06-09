@@ -86,6 +86,12 @@ BUILTIN_PRESETS: dict[str, dict[str, object]] = {
                     "remove_after": True,
                 },
             },
+            "ai_llm": {
+                "enabled": False,
+                "required": False,
+                "profile": "medium",
+                "reason": "Optional AI inference benchmark (llama.cpp); enable to record tokens/sec evidence on CPU or GPU.",
+            },
             "cllimits": {
                 "enabled": False,
                 "required": False,

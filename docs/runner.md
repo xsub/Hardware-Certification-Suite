@@ -556,6 +556,7 @@ Automated tests can be selected by Ansible tag.
 | `ltp` | Linux Test Project suites. |
 | `phoronix` | Phoronix benchmark suites. |
 | `gpu_burn` | Optional NVIDIA GPU Burn stress test. |
+| `ai_llm` | Optional AI inference benchmark (llama.cpp llama-bench), CPU or GPU. |
 | `cllimits` | CloudLinux LVE/CageFS checks. |
 
 Interactive tests are run through `interactive.yml` and are not split into the

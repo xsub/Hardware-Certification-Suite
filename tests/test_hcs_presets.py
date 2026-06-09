@@ -94,6 +94,7 @@ class RunnerPresetTests(unittest.TestCase):
         self.assertEqual(scopes["phoronix"], "required")
         self.assertEqual(scopes["raid"], "optional")
         self.assertEqual(scopes["gpu_burn"], "optional")
+        self.assertEqual(scopes["ai_llm"], "optional")
 
     def test_explicit_profile_ignores_default_preset_test_selection(self) -> None:
         with TemporaryDirectory() as tmp:
