@@ -24,6 +24,10 @@ try:
     REPORTLAB_AVAILABLE = True
 except Exception:  # pragma: no cover - exercised only without reportlab
     REPORTLAB_AVAILABLE = False
+    # The module-level _STATUS_BADGE table references `white`, so it must be
+    # defined even without reportlab. The drawing code that consumes it only
+    # runs when reportlab is available, so this fallback is never rendered.
+    white = "#FFFFFF"
 
 
 ASSETS_DIR = Path(__file__).parent / "assets"
