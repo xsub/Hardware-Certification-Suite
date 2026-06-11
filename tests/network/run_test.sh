@@ -36,8 +36,11 @@ function info() {
     printf "${BLUE}[$(date)] $1${NC}\n"
 }
 
+# SSH user for SUT commands; follows the Ansible connection user.
+SUT_SSH_USER=${HCS_NETWORK_SSH_USER:-root}
+
 sut_command() {
-    ssh -o StrictHostKeyChecking=no root@$SUT_HOST "$1"
+    ssh -o StrictHostKeyChecking=no ${SUT_SSH_USER}@$SUT_HOST "$1"
     return_code=$?
     if [ $return_code -gt 0 ] && [ "$2" != "true" ]; then
         error "Failed to execution SUT command: $1"
@@ -49,6 +52,16 @@ sut_command() {
     fi
 }
 
+# EL9+ minimal installs have no ifup/ifdown (NetworkManager only); use nmcli
+# when available and fall back to the legacy scripts.
+sut_link_down() {
+    sut_command 'if command -v nmcli > /dev/null 2>&1; then nmcli device disconnect '"$1"' > /dev/null 2>&1; else ifdown '"$1"' > /dev/null 2>&1; fi'
+}
+
+sut_link_up() {
+    sut_command 'if command -v nmcli > /dev/null 2>&1; then nmcli device connect '"$1"' > /dev/null 2>&1; else ifup '"$1"' > /dev/null 2>&1; fi'
+}
+
 iperf3_test() {
     # Clearing
     info "Clearing environment..."
@@ -58,14 +71,16 @@ iperf3_test() {
     info "Clearing complete"
     # End clearing
 
-    # Stopping firewall
+    # Stopping firewall (tolerated: a SUT/LTS without firewalld is fine)
     systemctl stop firewalld > /dev/null 2>&1
-    sut_command 'systemctl stop firewalld > /dev/null 2>&1'
+    sut_command 'systemctl stop firewalld > /dev/null 2>&1' true
 
     if [ "$TARGET_SPEED" != "false" ] && [ "$TARGET_SPEED" -gt 0 ]; then
         device_speed=$TARGET_SPEED
     else
-        device_speed=$(sut_command "ethtool $1 | grep -oP '\d+(?=baseT)' | tail -1")
+        # tolerated inside $(...): sut_command's error path would only set
+        # global_result in a subshell and pollute the captured speed value.
+        device_speed=$(sut_command "ethtool $1 | grep -oP '\d+(?=baseT)' | tail -1" true)
         if [ "$device_speed" == "Unknown" ] || [ "$device_speed" == "" ]; then
             # Debug mode. Need to fail test if speed not defined
             error "Device speed detection error. Test aborted! See: $ ethtool $1"
@@ -129,6 +144,10 @@ iperf3_test() {
 
 info "Starting new test..."
 
+# Remember firewall state so the test restores exactly what it found.
+LTS_FIREWALLD_WAS_ACTIVE=$(systemctl is-active firewalld 2>/dev/null)
+SUT_FIREWALLD_WAS_ACTIVE=$(sut_command 'systemctl is-active firewalld 2>/dev/null' true)
+
 # Check locales
 if [ "$(echo $LANG | grep -oP '\w{2}(?=_)')" != "en" ] || [ "$(sut_command "echo $LANG | grep -oP '\w{2}(?=_)'")" != "en" ]; then
     error "Your system language is not English! Test aborted!"
@@ -151,10 +170,10 @@ if [ "$global_result" == "true" ]; then
         for device_name in ${network_devices[@]}; do
             if [ "$device_name" != ${network_devices[$i]} ]; then
                 info "Device $device_name is down"
-                sut_command 'ifdown '"$device_name"' > /dev/null 2>&1'
+                sut_link_down "$device_name"
             else
                 info "Device $device_name is up"
-                sut_command 'ifup '"$device_name"' > /dev/null 2>&1'
+                sut_link_up "$device_name"
             fi
         done
 
@@ -189,15 +208,20 @@ if [ "$global_result" == "true" ]; then
         fi
     done
 
-    # Enabling devices
+    # Enabling devices (best effort; do not fail the recap over restore)
     info "Enabling devices..."
     for device_name in ${network_devices[@]}; do
-        sut_command 'ifup '"$device_name"' > /dev/null 2>&1 &'
+        sut_command 'if command -v nmcli > /dev/null 2>&1; then nmcli device connect '"$device_name"' > /dev/null 2>&1; else ifup '"$device_name"' > /dev/null 2>&1; fi' true
     done
 
-    # Starting firewall
-    systemctl start firewalld > /dev/null 2>&1
-    sut_command 'systemctl start firewalld > /dev/null 2>&1 &'
+    # Restore firewalls only where they were active before the test; do not
+    # background the restore — a killed script must not leave them down.
+    if [ "$LTS_FIREWALLD_WAS_ACTIVE" == "active" ]; then
+        systemctl start firewalld > /dev/null 2>&1
+    fi
+    if [ "$SUT_FIREWALLD_WAS_ACTIVE" == "active" ]; then
+        sut_command 'systemctl start firewalld > /dev/null 2>&1' true
+    fi
 fi
 
 info "For more information see the network.log file in the run logs directory."

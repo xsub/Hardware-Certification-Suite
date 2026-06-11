@@ -54,6 +54,10 @@
       ansible.builtin.command:
         sh {{ lts_tests_dir }}/network/run_test.sh {{ lts_ip }} {{ sut_ip }}
         {{ test_network['duration'] }} {{ test_network['speed'] }} disable-preloader {{ test_network['device'] }}
+      environment:
+        # The script SSHes to the SUT itself; follow the Ansible user instead
+        # of assuming root.
+        HCS_NETWORK_SSH_USER: "{{ ansible_user | default('root') }}"
       delegate_to: localhost
       register: output
 
