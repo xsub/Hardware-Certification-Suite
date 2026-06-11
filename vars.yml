@@ -43,6 +43,10 @@ test_network:
 test_raid:
   # Test duration in seconds
   duration: "{{ raid_duration|default('14400') }}"
+  # fio writes raw random data over the MD array device. By default only
+  # unmounted arrays without a data signature are stressed; set
+  # raid_allow_data_loss=true to stress arrays that hold data (DESTROYS DATA).
+  allow_data_loss: "{{ raid_allow_data_loss|default(false) }}"
 
 # PHORONIX
 test_phoronix:

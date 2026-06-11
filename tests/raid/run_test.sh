@@ -76,20 +76,45 @@ if [ "$raid_info" != "" ]; then
     info "Raid detected: $raid_info"
 else
     info "Raid not found! Test not running!"
-    success 'Test status: SUCCESS!'
+    echo "HCS_UNSUPPORTED: no MD RAID array present on the SUT"
     exit 0
-#    global_result=false
 fi
 
 # Run test
 if [ "$global_result" == "true" ]; then
     # Catching logical names of raid devices
     raid_devices=( $(cat /proc/mdstat | grep -oP '\w+(?= : active)') )
-    raid_devices_string="/dev/$(echo ${raid_devices[@]} | sed 's/ /\/:dev\//')"
     if [ ${#raid_devices[@]} -lt 1 ]; then
         error "Raid devices not found! Test aborted!"
         global_result=false
     else
+        # fio writes raw random data over the array device. Only stress arrays
+        # that are unmounted and carry no filesystem/LVM/LUKS signature, unless
+        # the operator explicitly accepts data loss (raid_allow_data_loss=true).
+        ALLOW_DATA_LOSS="${HCS_RAID_ALLOW_DATA_LOSS:-false}"
+        stress_devices=()
+        for device_name in "${raid_devices[@]}"; do
+            if lsblk -nro MOUNTPOINT "/dev/$device_name" 2>/dev/null | grep -q '[^[:space:]]'; then
+                info "Skipping /dev/$device_name: the array (or a partition on it) is mounted"
+                continue
+            fi
+            if blkid -p "/dev/$device_name" > /dev/null 2>&1 && [ "$ALLOW_DATA_LOSS" != "true" ]; then
+                info "Skipping /dev/$device_name: it holds a data signature; raid_allow_data_loss=true stresses it anyway (DESTROYS DATA)"
+                continue
+            fi
+            stress_devices+=("$device_name")
+        done
+
+        if [ ${#stress_devices[@]} -lt 1 ]; then
+            echo "HCS_UNSUPPORTED: no safely writable MD array (all arrays are mounted or hold data; raid_allow_data_loss=true overrides)"
+            exit 0
+        fi
+
+        # fio takes colon-separated device paths: /dev/md0:/dev/md1
+        raid_devices_string=$(printf '/dev/%s:' "${stress_devices[@]}")
+        raid_devices_string="${raid_devices_string%:}"
+        info "Stressing: $raid_devices_string"
+
         # Start storage stress test
         fio_pid=$(nohup fio -direct=1 -iodepth=32 -rw=randrw\
         -bs=4k -numjobs=4 -time_based=1 -runtime="$TEST_TIME"\

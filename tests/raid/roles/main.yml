@@ -1,13 +1,21 @@
 ---
 
 # Setup
+- name: Test RAID - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: Test RAID - note which packages HCS will install
+  # Remove only these afterwards; removing the full list would uninstall
+  # packages the operator already had.
+  ansible.builtin.set_fact:
+    raid_new_pkgs: "{{ ['mdadm', 'fio'] | difference(ansible_facts.packages.keys() | list) }}"
+
 - name: Test RAID - install dependent software
-  package:
+  ansible.builtin.package:
     name:
       - mdadm
       - fio
     state: present
-  register: raid_pkgs
 
 # Necessary settings before running tests on opennebula
 - name: remember current vd
@@ -47,25 +55,32 @@
 # Test
 - name: Test RAID - run test
   ansible.builtin.shell: "{{ sut_tests_dir }}/raid/run_test.sh {{ test_raid['duration'] }} disable-preloader"
+  environment:
+    # fio writes raw data over the array; the script skips arrays that are
+    # mounted or hold data unless the operator opts into data loss.
+    HCS_RAID_ALLOW_DATA_LOSS: "{{ test_raid['allow_data_loss'] }}"
   register: output
 
 - name: Test RAID - copy log
   local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/raid.log"
 
-- name: Test RAID - unsupported when no MD array is present
+- name: Test RAID - collect unsupported marker
+  ansible.builtin.set_fact:
+    hcs_raid_unsupported: "{{ output.stdout_lines | select('match', '^HCS_UNSUPPORTED:') | list | first | default('') }}"
+
+- name: Test RAID - report unsupported status to runner
   ansible.builtin.debug:
-    msg: "HCS_UNSUPPORTED: no MD RAID array present on the SUT"
-  when: output.stdout is search('Raid not found')
+    msg: "{{ hcs_raid_unsupported }}"
+  when: hcs_raid_unsupported | length > 0
 
 - name: Test RAID - report failure to runner
   ansible.builtin.debug:
     msg: "HCS_RESULT: fail raid run_test.sh exited rc={{ output.rc }}"
-  when: output.rc | default(0) != 0
+  when: hcs_raid_unsupported | length == 0 and output.rc | default(0) != 0
 
 # Cleanup
-- name: Test RAID - cleanup
-  package:
-    name:
-      - fio
-    state: removed
-  when: raid_pkgs.changed
+- name: Test RAID - remove only packages HCS installed
+  ansible.builtin.package:
+    name: "{{ raid_new_pkgs }}"
+    state: absent
+  when: raid_new_pkgs | length > 0
