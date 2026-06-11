@@ -95,8 +95,10 @@ python -m hcs run --preset certification
 python -m hcs run --preset certification --host <SUT IP>
 ```
 
-For long runs, start inside `tmux` or `screen`, from a privileged shell when
-selected tests need package installation or direct hardware access.
+For long runs, start inside `tmux` or `screen`. Run from a privileged shell:
+the certification tests install packages and `hw_detection` reads SMBIOS/DMI
+tables, which requires root (it fails loudly rather than producing an empty
+hardware report).
 
 ### What the Runner Provides
 

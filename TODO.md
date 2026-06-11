@@ -25,9 +25,10 @@
     panels.
   Keep the report print-formal; do not copy the page's purple/cyan marketing
   panels.
-- [ ] Give the Phoronix role an explicit `HCS_RESULT` / `HCS_UNSUPPORTED` marker
+- [x] Give the Phoronix role an explicit `HCS_RESULT` / `HCS_UNSUPPORTED` marker
   so an insufficient-disk-space outcome reads clearly in the report instead of
-  the generic "recap reported ignored tasks".
+  the generic "recap reported ignored tasks". (Done: insufficient space and
+  undefined EL releases both emit `HCS_UNSUPPORTED` with the details.)
 
 ## AI benchmarking (future work)
 

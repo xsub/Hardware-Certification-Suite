@@ -1,5 +1,58 @@
 # Changelog
 
+## 2026-06-11 - audit fixes: truthful evidence, safe RAID, exact cleanup
+
+Runner (Python):
+
+- Fixed a crash when streamed Ansible output contained Rich-markup-like text:
+  bracketed paths in fatal dumps (`[/var/tmp/...]`) parsed as closing tags and
+  raised `MarkupError` mid-suite. Live-line text is now escaped
+  (regression-tested).
+- Run statuses can no longer overstate evidence: interrupted runs report
+  `interrupted`, `--dry-run` reports `dry_run`, and steps that never executed
+  (Ctrl-C, `--stop-on-failure`) are recorded as `not_run` with the reason —
+  in `run.summary.json`, `run.report.txt`, the recap, and the PDF badge.
+- The certification preset's manual tests (`usb`, `pxe`) now appear in all
+  three reports as "not executed by the runner".
+- CLI `--extra-var` now has top precedence (it silently lost to preset
+  per-test vars such as duration caps).
+- Added `--step-timeout` / `run.step_timeout`: a wedged step is terminated
+  (SIGTERM, then SIGKILL after a grace period) and recorded as failed.
+- `lts_tests_dir` is anchored to the playbook directory, so runner-driven runs
+  work from any working directory.
+- The PDF survives arbitrary failure-reason text (`<...>` used to abort
+  reportlab and skip the report on exactly the runs that failed) and labels
+  the cover facts as the controller's.
+
+Ansible tests:
+
+- RAID: fio no longer writes over arrays that are mounted or hold a
+  filesystem/LVM/LUKS signature — it skips them and reports
+  `HCS_UNSUPPORTED` when nothing is safely writable; opt back in with
+  `raid_allow_data_loss=true`. Fixed the malformed multi-array fio target
+  (`/dev/md0/:dev/md1`).
+- Package cleanup across containers/kvm/ltp/ai_llm/network/raid/cllimits/
+  hw_detection/phoronix now snapshots the installed set and removes exactly
+  what the test added. The old "remove the full list when anything changed"
+  pattern could uninstall pre-existing packages — LTP's list included
+  `findutils` and `iproute` on a stock SUT.
+- Network: remoteness is decided by `ansible_connection`, not
+  `SSH_CONNECTION` — a local run started from an SSH session no longer
+  masquerades as remote and targets the operator's workstation. Uses
+  `systemctl` instead of the legacy `service` wrapper.
+- Phoronix: undefined EL releases (e.g. EL8) and insufficient disk space now
+  emit `HCS_UNSUPPORTED` with details instead of template errors or
+  `failed_when` noise; `pipefail` keeps `tee` from masking the benchmark's
+  exit code.
+- cllimits: emits `HCS_UNSUPPORTED` on AlmaLinux instead of false-passing a
+  skipped include; gained the standard `HCS_RESULT: fail` contract.
+- hw_detection: installs its report tools, requires root, verifies SMBIOS is
+  readable, and fails loudly instead of passing with an empty report.
+- KVM: `libvirtd` is started, not restarted (do not bounce a SUT already
+  running VMs).
+- ai_llm: optional `ai_llm_model_sha256` verifies configured, cached, and
+  downloaded GGUF models before benchmarking.
+
 ## 2026-06-09 - AI inference test (llama.cpp)
 
 - Added an optional `ai_llm` runner/Ansible test that benchmarks AI inference

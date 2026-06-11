@@ -12,13 +12,18 @@ designed:
 
 | Test | AlmaLinux 10.2 result |
 | --- | --- |
-| `hw_detection` | passed |
-| `containers` | passed (podman; packages cleaned up afterward) |
+| `hw_detection` | passed; requires root (SMBIOS/DMI via `/dev/mem`) and fails loudly without it |
+| `containers` | passed (podman; only newly installed packages removed afterward) |
 | `kvm` | passed where CPU virtualization is present; `unsupported` where it is not |
 | `cpu` | passed (`stress-ng`; operator-preinstalled packages left in place) |
 | `network` | `unsupported` on a single host; runs over SSH against a distinct SUT |
 | `ltp` | passed; builds the modern `20250930` tag (override with `ltp_version`) |
-| `phoronix` | space-bound (100–300 GB); exercised where capacity allows |
+| `phoronix` | space-bound (100–300 GB); `unsupported` with the available/required sizes when capacity is missing |
+| `raid` | stresses only unmounted, signature-free MD arrays by default; `raid_allow_data_loss=true` overrides |
+
+Tests that install packages snapshot the installed set first and remove only
+what they added, so a certification run leaves the SUT's package set as it
+found it.
 
 CI additionally smoke-tests the runner and Ansible syntax on AlmaLinux 8, 9, and
 10, and runs the `check` profile plus the single-host `network` path
@@ -256,10 +261,21 @@ Repeat the selected plan and keep data from every pass:
 python -m hcs run --profile check --repeat 3
 ```
 
-Override an Ansible variable while using the runner:
+Override an Ansible variable while using the runner. `--extra-var` always has
+the last word: it overrides profile, config, and preset per-test values
+(including preset duration caps).
 
 ```bash
 python -m hcs run --profile medium --extra-var cpu_duration=20m
+```
+
+Cap how long any single step may run. A step that exceeds the limit is
+terminated (SIGTERM, then SIGKILL) and recorded as failed; the rest of the
+plan continues. Set it once in `hcs-runner.yml` with `run.step_timeout`, or
+per run:
+
+```bash
+python -m hcs run --preset certification --step-timeout 4h
 ```
 
 Run the optional NVIDIA [GPU Burn](https://github.com/wilicc/gpu-burn) test.
@@ -510,6 +526,15 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 | `run.report.pdf` | Branded PDF report (official AlmaLinux styling) for review and submission. Skipped only if `reportlab` is unavailable. |
 
+Run statuses are truthful by construction: a completed run is `passed`,
+`passed_with_warnings` (some steps `unsupported`), or `failed`; an interrupted
+run is `interrupted` and a `--dry-run` is `dry_run` — neither ever reads as
+`passed`. Steps planned but never executed (Ctrl-C, `--stop-on-failure`)
+appear as `not_run` with the reason. When the preset declares manual tests
+(`usb`, `pxe` in `certification`), all three reports list them explicitly as
+not executed by the runner, so automated-only evidence states what it does not
+cover.
+
 ## Remote LTS/SUT
 
 Use remote mode when the controller and SUT are different machines.
@@ -611,6 +636,7 @@ direct playbook use and advanced tuning.
 | `test_network.speed` | Target network test speed in Mbps. |
 | `test_network.device` | Optional network device selector. |
 | `test_raid.duration` | RAID test duration in seconds. |
+| `test_raid.allow_data_loss` | Stress MD arrays even when they hold a filesystem/LVM/LUKS signature (`raid_allow_data_loss=true`). fio overwrites raw array data; default `false` stresses only unmounted, signature-free arrays. |
 | `ltp_version` | LTP git tag or branch to clone and build. Defaults to a recent stable LTP release. |
 | `test_ltp.suites` | LTP suite pattern. |
 | `test_ltp.log_file` | LTP full log path on the SUT. |
@@ -626,6 +652,7 @@ direct playbook use and advanced tuning.
 | `test_gpu_burn.binary` | Existing or built GPU Burn binary path. |
 | `test_gpu_burn.telemetry_file` | NVIDIA telemetry CSV collected during the run. |
 | `test_gpu_burn.result_file` | GPU Burn JSON result artifact. |
+| `test_ai_llm.model_sha256` | Optional sha256 of the GGUF model (`ai_llm_model_sha256`). When set, configured, cached, and downloaded models are verified before benchmarking. |
 
 ## Adding Tests
 
