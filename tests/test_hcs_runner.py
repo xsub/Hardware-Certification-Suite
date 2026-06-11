@@ -343,6 +343,10 @@ class DefaultConnectionTests(unittest.TestCase):
         for inventory in ("127.0.0.1,", "localhost,", "::1,", "127.0.0.1,localhost,"):
             self.assertEqual(default_connection(inventory), "local", inventory)
 
+    def test_whole_loopback_range_and_case_insensitive_names_run_local(self) -> None:
+        for inventory in ("127.0.0.2,", "127.255.255.254,", "LOCALHOST,"):
+            self.assertEqual(default_connection(inventory), "local", inventory)
+
     def test_remote_host_defers_to_ansible_default(self) -> None:
         self.assertIsNone(default_connection("10.0.0.5,"))
         self.assertIsNone(default_connection("sut.example.com,"))
@@ -516,6 +520,82 @@ class ExecuteStepTests(unittest.TestCase):
         self.assertEqual(result.status, "failed")
         self.assertIn("timed out", result.status_reason)
         self.assertLess(result.duration_seconds, 20.0)
+
+    def test_step_timeout_escalates_to_sigkill_for_term_ignoring_children(self) -> None:
+        script = (
+            "#!/bin/sh\n"
+            "trap '' TERM\n"
+            "i=0\n"
+            "while [ $i -lt 300 ]; do sleep 0.1 || :; i=$((i+1)); done\n"
+        )
+        with TemporaryDirectory() as tmp:
+            with mock.patch("hcs.runner.TERMINATE_GRACE_SECONDS", 0.3):
+                result = self._run_step(tmp, script, step_timeout=0.5)
+
+        self.assertEqual(result.status, "failed")
+        self.assertIn("timed out", result.status_reason)
+        self.assertLess(result.duration_seconds, 15.0)
+
+    def test_explicit_fail_marker_overrides_an_earlier_pass_marker(self) -> None:
+        script = (
+            "#!/bin/sh\n"
+            'echo \'    "msg": "HCS_RESULT: pass subtest one ok"\'\n'
+            'echo \'    "msg": "HCS_RESULT: fail subtest two broke"\'\n'
+            'echo "127.0.0.1 : ok=3 changed=0 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0"\n'
+            "exit 0\n"
+        )
+        with TemporaryDirectory() as tmp:
+            result = self._run_step(tmp, script)
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.status_reason, "subtest two broke")
+
+
+class RequiredUnexercisedTests(unittest.TestCase):
+    def _result(self, test_id: str, status: str, reason: str = "ok") -> StepResult:
+        result = step(status)
+        result.test_id = test_id
+        result.status_reason = reason
+        return result
+
+    def test_lists_required_tests_without_a_verdict(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runner = make_runner(
+                tmp,
+                dry_run=False,
+                selected_tests=("hw_detection", "network"),
+                test_scopes={
+                    "hw_detection": "required",
+                    "network": "required",
+                    "raid": "required",
+                    "cpu": "optional",
+                },
+            )
+            results = [
+                self._result("hw_detection", "passed"),
+                self._result("network", "unsupported", "needs a distinct SUT"),
+            ]
+            unexercised = runner.required_unexercised(results)
+
+        by_id = {entry["test_id"]: entry["reason"] for entry in unexercised}
+        self.assertIn("network", by_id)
+        self.assertIn("unsupported", by_id["network"])
+        self.assertIn("raid", by_id)
+        self.assertIn("not selected", by_id["raid"])
+        self.assertNotIn("hw_detection", by_id)
+        self.assertNotIn("cpu", by_id)
+
+    def test_exercised_required_tests_are_not_listed(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runner = make_runner(
+                tmp,
+                dry_run=False,
+                selected_tests=("hw_detection",),
+                test_scopes={"hw_detection": "required"},
+            )
+            unexercised = runner.required_unexercised([self._result("hw_detection", "failed", "rc=2")])
+
+        self.assertEqual(unexercised, [])
 
 
 class ParseExtraVarsTests(unittest.TestCase):

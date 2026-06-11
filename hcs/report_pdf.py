@@ -135,6 +135,8 @@ def write_pdf_report(
     total_seconds: float,
     version: str,
     manual_tests: Sequence[tuple[str, str, str]] = (),
+    inventory: str | None = None,
+    required_unexercised: Sequence[tuple[str, str]] = (),
 ) -> bool:
     """Write a branded PDF report. Returns False if reportlab is unavailable."""
     if not REPORTLAB_AVAILABLE:
@@ -198,6 +200,7 @@ def write_pdf_report(
         meta = [
             ("Controller system", system_title),
             ("Controller OS", facts.get("OS", "—")),
+            ("Inventory", inventory or "—"),
             ("Run ID", run_id),
             ("Profile", profile),
             ("Preset", preset_name or "—"),
@@ -377,6 +380,25 @@ def write_pdf_report(
                 Paragraph(
                     f"<b>{xml_escape(str(result.get('display_name', result.get('test_id', ''))))}</b> "
                     f"({xml_escape(str(result.get('status')))}): {xml_escape(str(result.get('status_reason')))}",
+                    styles["reason"],
+                )
+            )
+
+    if required_unexercised:
+        story.append(Spacer(1, 6 * mm))
+        story.append(Paragraph("Required tests not exercised in this run", styles["h2"]))
+        story.append(
+            Paragraph(
+                "The policy marks these tests required, but this run produced no "
+                "pass/fail verdict for them. This report alone is not complete "
+                "certification evidence.",
+                styles["reason"],
+            )
+        )
+        for test_id, reason in required_unexercised:
+            story.append(
+                Paragraph(
+                    f"<b>{xml_escape(test_id)}</b>: {xml_escape(reason)}",
                     styles["reason"],
                 )
             )

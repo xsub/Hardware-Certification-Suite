@@ -340,6 +340,75 @@ def parse_duration_seconds(raw: str) -> int | None:
     return amount * multiplier
 
 
+# Recognized hcs-runner.yml keys; anything else is a probable typo that would
+# otherwise be ignored silently.
+KNOWN_TOP_KEYS = frozenset({"run", "presets", "paths", "ansible"})
+KNOWN_RUN_KEYS = frozenset({"base_dir", "sandbox_dir", "id", "default_preset", "step_timeout"})
+KNOWN_PATHS_KEYS = frozenset(
+    {"runner_dir", "logs_dir", "scratch_dir", "cache_dir", "artifacts_dir", "sut_tests_dir", "phoronix_dir", "ltp_dir"}
+)
+KNOWN_ANSIBLE_KEYS = frozenset({"extra_vars"})
+KNOWN_PRESET_KEYS = frozenset(
+    {"description", "profile", "inventory", "connection", "repeat", "tests", "manual_tests", "extra_vars"}
+)
+KNOWN_TEST_KEYS = frozenset({"enabled", "required", "profile", "duration", "reason", "extra_vars", "snap"})
+
+
+def config_warnings(config: Mapping[str, object], preset: Mapping[str, object] | None) -> list[str]:
+    """Unknown-key warnings for hcs-runner.yml; typos must not vanish silently."""
+    warnings: list[str] = []
+
+    def check(section: Mapping[str, object] | None, known: frozenset[str], where: str) -> None:
+        if not isinstance(section, Mapping):
+            return
+        for key in section:
+            if str(key) not in known:
+                warnings.append(f"unknown key '{key}' in {where} is ignored")
+
+    check(config, KNOWN_TOP_KEYS, "the runner config")
+    check(config.get("run") if isinstance(config.get("run"), Mapping) else None, KNOWN_RUN_KEYS, "run")
+    check(config.get("paths") if isinstance(config.get("paths"), Mapping) else None, KNOWN_PATHS_KEYS, "paths")
+    check(config.get("ansible") if isinstance(config.get("ansible"), Mapping) else None, KNOWN_ANSIBLE_KEYS, "ansible")
+    if preset is not None:
+        check(preset, KNOWN_PRESET_KEYS, "the preset")
+        tests = preset.get("tests")
+        if isinstance(tests, Mapping):
+            for test_id, test_config in tests.items():
+                if isinstance(test_config, Mapping):
+                    check(test_config, KNOWN_TEST_KEYS, f"preset test '{test_id}'")
+    return warnings
+
+
+def preset_duration_warnings(preset: Mapping[str, object] | None) -> list[str]:
+    """Tell the operator when a preset duration is silently clamped to the profile cap."""
+    tests = preset_tests_section(preset)
+    if not isinstance(tests, Mapping):
+        return []
+    base_profile = preset_base_profile(preset) or "check"
+    test_profiles = preset_test_profiles(preset)
+    warnings: list[str] = []
+    for raw_test_id, raw_config in tests.items():
+        test_id = str(raw_test_id)
+        if not isinstance(raw_config, Mapping) or test_id not in DURATION_VAR_BY_TEST:
+            continue
+        duration = raw_config.get("duration")
+        if duration in (None, ""):
+            continue
+        requested_seconds = parse_duration_seconds(str(duration))
+        if requested_seconds is None:
+            warnings.append(f"{test_id}: duration '{duration}' is not a recognized duration; passing it through unparsed")
+            continue
+        profile = test_profiles.get(test_id, base_profile)
+        profile_value = PROFILES[profile].extra_vars.get(DURATION_VAR_BY_TEST[test_id])
+        profile_seconds = parse_duration_seconds(profile_value) if profile_value else None
+        if profile_seconds is not None and requested_seconds > profile_seconds:
+            warnings.append(
+                f"{test_id}: duration '{duration}' exceeds the '{profile}' profile cap of "
+                f"{profile_value}; the profile cap wins (raise the test's profile or use --extra-var)"
+            )
+    return warnings
+
+
 def limiting_duration_value(test_id: str, profile: str, requested: str) -> str | None:
     if test_id not in DURATION_VAR_BY_TEST:
         return None

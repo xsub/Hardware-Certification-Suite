@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -57,6 +58,16 @@ ANSIBLE_ENV = {
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "ip6-localhost"})
 
 
+def is_loopback_host(host: str) -> bool:
+    """True for loopback names and any loopback IP (the whole 127.0.0.0/8)."""
+    if host.lower() in LOOPBACK_HOSTS:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def default_connection(inventory: str) -> str | None:
     """Infer the Ansible connection from the inventory when none is set.
 
@@ -66,7 +77,7 @@ def default_connection(inventory: str) -> str | None:
     controller via a hardcoded ``-c local`` — wrong-machine evidence.
     """
     hosts = [host.strip() for host in inventory.split(",") if host.strip()]
-    if hosts and all(host in LOOPBACK_HOSTS for host in hosts):
+    if hosts and all(is_loopback_host(host) for host in hosts):
         return "local"
     return None
 
@@ -351,6 +362,12 @@ class CertificationRunner:
         return command
 
     def prepare_run_dir(self) -> None:
+        if (self.run_dir / "run.summary.json").exists():
+            self.console.print(
+                "[yellow]Sandbox already holds a previous run's reports; they will be "
+                "overwritten. Unset run.sandbox_dir (or change --sandbox-dir) to keep "
+                "one sandbox per run.[/yellow]"
+            )
         for directory in (
             self.paths.sandbox_dir,
             self.paths.runner_dir,
@@ -424,6 +441,28 @@ class CertificationRunner:
             return "interrupted"
         return run_status(results)
 
+    def required_unexercised(self, results: list[StepResult]) -> list[dict[str, str]]:
+        """Required-scope tests this run did not actually exercise.
+
+        A required test counts as exercised only when some pass produced a
+        hard verdict (passed or failed). Required tests that were unsupported,
+        skipped, never run, disabled in the preset, or filtered out by --test
+        must be visible in the evidence, or a partial run reads as complete.
+        """
+        exercised = {r.test_id for r in results if r.status in ("passed", "failed")}
+        notes: dict[str, str] = {}
+        for result in results:
+            if result.test_id in exercised:
+                continue
+            if self.options.test_scopes.get(result.test_id) != "required":
+                continue
+            notes.setdefault(result.test_id, f"{result.status}: {result.status_reason}")
+        planned = {test.test_id for test in self.selected_tests()}
+        for test_id, scope in self.options.test_scopes.items():
+            if scope == "required" and test_id not in exercised and test_id not in planned:
+                notes.setdefault(test_id, "not selected for this run (disabled in the preset or filtered by --test)")
+        return [{"test_id": test_id, "reason": reason} for test_id, reason in notes.items()]
+
     def write_summary(
         self,
         results: list[StepResult],
@@ -438,6 +477,8 @@ class CertificationRunner:
             "runner_version": __version__,
             "preset": self.options.preset_name,
             "profile": self.profile.name,
+            "inventory": self.options.inventory,
+            "connection": self.options.connection,
             "repeat": self.options.repeat,
             "status": status,
             "interrupted": interrupted,
@@ -445,6 +486,7 @@ class CertificationRunner:
             "finished_at": finished_at,
             "paths": self.paths.as_dict(),
             "manual_tests": self.options.manual_tests,
+            "required_unexercised": self.required_unexercised(results),
             "controller_system": system_summary_payload(self.system_summary),
             "results": [
                 {
@@ -503,6 +545,9 @@ class CertificationRunner:
             )
             for test_id, info in self.options.manual_tests.items()
         ]
+        unexercised_rows = [
+            (entry["test_id"], entry["reason"]) for entry in self.required_unexercised(results)
+        ]
         try:
             written = render_pdf(
                 self.run_dir / "run.report.pdf",
@@ -521,6 +566,8 @@ class CertificationRunner:
                 total_seconds=recap.total_seconds,
                 version=__version__,
                 manual_tests=manual_rows,
+                inventory=self.options.inventory,
+                required_unexercised=unexercised_rows,
             )
         except Exception as exc:  # never fail the run over a report
             self.console.print(f"[yellow]PDF report skipped:[/yellow] {exc}")
@@ -543,6 +590,7 @@ class CertificationRunner:
             f"Runner directory: {self.run_dir}",
             f"Preset: {self.options.preset_name or 'none'}",
             f"Profile: {self.profile.name}",
+            f"Inventory: {self.options.inventory}",
             f"Status: {status}",
             f"Started: {started_at}",
             f"Finished: {finished_at}",
@@ -565,6 +613,11 @@ class CertificationRunner:
                 f"{result.test_id:16} {scope:8} {result.status:8} {result.duration_seconds:.1f}s "
                 f"rc={result.return_code} {result.status_reason}"
             )
+        unexercised = self.required_unexercised(results)
+        if unexercised:
+            lines.extend(["", "Required tests not exercised in this run:"])
+            for entry in unexercised:
+                lines.append(f"  {entry['test_id']:16} {entry['reason']}")
         if self.options.manual_tests:
             lines.extend(["", "Manual tests (not executed by the runner):"])
             for test_id, info in self.options.manual_tests.items():
@@ -655,9 +708,13 @@ class CertificationRunner:
                         stripped = line.strip()
                         if stripped:
                             result = RESULT_RE.search(stripped)
-                            if result and result_status is None:
-                                result_status = result.group("status")
-                                result_reason = (result.group("reason") or "").strip() or None
+                            if result:
+                                marker_status = result.group("status")
+                                # First marker wins, except an explicit fail
+                                # always overrides an earlier non-fail marker.
+                                if result_status is None or (marker_status == "fail" and result_status != "fail"):
+                                    result_status = marker_status
+                                    result_reason = (result.group("reason") or "").strip() or None
                             unsupported = UNSUPPORTED_RE.search(stripped)
                             if unsupported and unsupported_reason is None:
                                 unsupported_reason = unsupported.group("reason").strip()
@@ -747,6 +804,12 @@ class CertificationRunner:
         if recap.slowest is not None:
             totals += f", slowest {recap.slowest.display_name} {recap.slowest.duration_seconds:.1f}s"
         self.console.print(totals)
+        unexercised = self.required_unexercised(results)
+        if unexercised:
+            names = ", ".join(entry["test_id"] for entry in unexercised)
+            self.console.print(
+                f"[yellow]Required tests not exercised in this run:[/yellow] {escape(names)}"
+            )
 
     def run(self) -> int:
         tests = self.selected_tests()

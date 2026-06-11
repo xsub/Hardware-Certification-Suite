@@ -18,9 +18,11 @@ from .presets import (
     DURATION_VAR_BY_TEST,
     PROFILE_ORDER,
     config_default_preset,
+    config_warnings,
     get_preset,
     parse_duration_seconds,
     preset_base_profile,
+    preset_duration_warnings,
     preset_extra_vars,
     preset_manual_tests,
     preset_positive_int,
@@ -149,7 +151,11 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
         choices=["auto", "local", "ssh", "smart", "paramiko"],
         default=preset_str(existing, "connection") or "auto",
     )
-    repeat = IntPrompt.ask("Repeat passes", default=preset_positive_int(existing, "repeat") or 1)
+    while True:
+        repeat = IntPrompt.ask("Repeat passes", default=preset_positive_int(existing, "repeat") or 1)
+        if repeat >= 1:
+            break
+        console.print("[red]Repeat passes must be >= 1.[/red]")
 
     console.print()
     console.print("[bold]Select tests[/bold]")
@@ -167,6 +173,11 @@ def configure_preset(args: argparse.Namespace, console: Console) -> int:
             default=default_enabled,
         )
         if not enabled:
+            if required:
+                console.print(
+                    f"[yellow]{test_id} is required by this preset; runs will record it "
+                    "as a required test not exercised.[/yellow]"
+                )
             selected_tests[test_id] = {"enabled": False, "required": required}
             continue
 
@@ -269,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
             test_extra_vars = preset_test_extra_vars(preset)
             test_scopes = preset_test_scopes(preset)
             manual_tests = preset_manual_tests(preset)
+            for warning in (*config_warnings(config, preset), *preset_duration_warnings(preset)):
+                console.print(f"[yellow]config warning:[/yellow] {escape(warning)}")
             step_timeout_raw = args.step_timeout or config_str(config, "run", "step_timeout")
             step_timeout: float | None = None
             if step_timeout_raw:

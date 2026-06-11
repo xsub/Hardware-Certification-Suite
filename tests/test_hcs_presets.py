@@ -9,9 +9,11 @@ import unittest
 
 from hcs.__main__ import main
 from hcs.presets import (
+    config_warnings,
     get_preset,
     limiting_duration_value,
     parse_duration_seconds,
+    preset_duration_warnings,
     preset_selected_tests,
     preset_test_extra_vars,
     preset_test_profiles,
@@ -166,6 +168,47 @@ presets:
         # The policy's interactive tests must appear in the evidence.
         self.assertEqual(sorted(summary["manual_tests"]), ["pxe", "usb"])
         self.assertTrue(all(entry["required"] for entry in summary["manual_tests"].values()))
+
+
+class ConfigWarningTests(unittest.TestCase):
+    def test_flags_unknown_keys_everywhere(self) -> None:
+        config = {"run": {"base_dirr": "/x"}, "presetz": {}, "presets": {}}
+        preset = {
+            "profile": "check",
+            "unknown_key": 1,
+            "tests": {"cpu": {"enabled": True, "durationn": "5m"}},
+        }
+        warnings = config_warnings(config, preset)
+
+        joined = "\n".join(warnings)
+        self.assertIn("base_dirr", joined)
+        self.assertIn("presetz", joined)
+        self.assertIn("unknown_key", joined)
+        self.assertIn("durationn", joined)
+
+    def test_clean_config_and_builtin_preset_warn_nothing(self) -> None:
+        config = {"run": {"base_dir": "/var/tmp", "default_preset": "certification"}}
+        preset = get_preset({}, "certification")
+
+        self.assertEqual(config_warnings(config, preset), [])
+
+
+class DurationWarningTests(unittest.TestCase):
+    def test_warns_when_duration_exceeds_the_profile_cap(self) -> None:
+        preset = {"profile": "medium", "tests": {"cpu": {"enabled": True, "duration": "2h"}}}
+        warnings = preset_duration_warnings(preset)
+
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("cpu", warnings[0])
+        self.assertIn("profile cap", warnings[0])
+
+    def test_silent_when_duration_is_within_the_cap(self) -> None:
+        preset = {"profile": "medium", "tests": {"cpu": {"enabled": True, "duration": "5m"}}}
+
+        self.assertEqual(preset_duration_warnings(preset), [])
+
+    def test_builtin_certification_preset_warns_nothing(self) -> None:
+        self.assertEqual(preset_duration_warnings(get_preset({}, "certification")), [])
 
 
 class ConnectionDefaultingTests(unittest.TestCase):
