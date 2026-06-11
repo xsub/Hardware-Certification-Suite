@@ -88,3 +88,10 @@
     name: "{{ ltp_new_pkgs }}"
     state: absent
   when: ltp_new_pkgs | length > 0
+
+- name: TEST LTP - remove the LTP install tree
+  # make install puts LTP under /opt/ltp outside the sandbox; leave the SUT
+  # as found. The clone/build tree lives in the sandbox and is kept.
+  ansible.builtin.file:
+    path: /opt/ltp
+    state: absent

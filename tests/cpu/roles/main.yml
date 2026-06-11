@@ -1,7 +1,16 @@
 ---
 
+- name: Test cpu - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: Test cpu - note which packages HCS will install
+  # Remove only these afterwards; an operator-preinstalled stress-ng or EPEL
+  # repo stays in place.
+  ansible.builtin.set_fact:
+    cpu_new_pkgs: "{{ ['epel-release', 'stress-ng'] | difference(ansible_facts.packages.keys() | list) }}"
+
 - name: Test cpu - enable epel
-  yum:
+  ansible.builtin.package:
     name: epel-release
     state: latest
 
@@ -10,7 +19,6 @@
     name: stress-ng
     state: present
     enablerepo: epel
-  register: cpu_stress_pkg
 
 - name: Test CPU - create scratch dir
   ansible.builtin.file:
@@ -34,9 +42,8 @@
     msg: "HCS_RESULT: fail cpu run_test.sh exited rc={{ output.rc }}"
   when: output.rc | default(0) != 0
 
-- name: Test CPU - uninstall packages HCS installed
-  yum:
-    name:
-      - stress-ng
+- name: Test CPU - remove only packages HCS installed
+  ansible.builtin.package:
+    name: "{{ cpu_new_pkgs }}"
     state: absent
-  when: cpu_stress_pkg.changed
+  when: cpu_new_pkgs | length > 0

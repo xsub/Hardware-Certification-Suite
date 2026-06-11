@@ -18,7 +18,8 @@
           ansible.builtin.file:
             path: "{{ lts_logs_dir }}"
             state: "directory"
-            mode: "0755"
+            # certification evidence is not world-readable
+            mode: "0750"
           delegate_to: localhost
 
     - name: Create SUT work dirs
@@ -28,7 +29,8 @@
           ansible.builtin.file:
             path: "{{ item }}"
             state: "directory"
-            mode: "0755"
+            # certification evidence is not world-readable
+            mode: "0750"
           loop:
             - "{{ hcs_work_dir }}"
             - "{{ hcs_scratch_dir }}"
