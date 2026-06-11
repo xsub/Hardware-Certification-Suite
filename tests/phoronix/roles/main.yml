@@ -1,167 +1,185 @@
 ---
-# Enable PowerTools/CRB
-- name: Ensure the powertools repository is enabled
-  community.general.dnf_config_manager:
-    name: powertools
-    state: enabled
-  when: ansible_facts['distribution_major_version'] | int == 8
 
-- name: Ensure the crb repository is enabled
-  community.general.dnf_config_manager:
-    name: crb
-    state: enabled
-  when: ansible_facts['distribution_major_version'] | int > 8
+- name: Phoronix - define release support
+  ansible.builtin.set_fact:
+    phoronix_release_supported: "{{ ansible_facts['distribution_major_version'] | int in test_phoronix['tests'] }}"
 
-# Setup
-- name: Increase open file limits
-  ansible.posix.sysctl:
-    name: fs.file-max
-    value: 1000000
-    state: present
-
-- name: Phoronix - create work dir
-  ansible.builtin.file:
-    path: "{{ test_phoronix['folder'] }}"
-    state: directory
-    mode: "0755"
-
-- name: Phoronix - df
-  shell: "df -BG --output=avail {{ test_phoronix['folder'] }} | grep -o '[0-9]*'"
-  register: df_output
-
-- name: Phoronix - check space
+- name: Phoronix - report unsupported release to runner
   ansible.builtin.debug:
-    msg:
-      "You don't have enough free disk space to install all test dependencies.\n
-      You need more than 100 gb of free space.\n
-      Please change the path to the folder in variable test_phoronix['folder'] in file vars.yml."
-  when: df_output.stdout|int < test_phoronix['need_space']|int
-  failed_when: df_output.stdout|int < test_phoronix['need_space']|int
+    msg: "HCS_UNSUPPORTED: no Phoronix benchmark set defined for EL{{ ansible_facts['distribution_major_version'] }} (see test_phoronix.tests in vars.yml)"
+  when: not phoronix_release_supported | bool
 
-- name: Phoronix - error log
-  local_action: copy content="Failed, don't have enough free disk space" dest="{{ lts_logs_dir }}/phoronix.log"
-  when: df_output.stdout|int < test_phoronix['need_space']|int
-
-- when: df_output.stdout|int >= test_phoronix['need_space']|int
+- name: Phoronix - run on a supported release
+  when: phoronix_release_supported | bool
   block:
-    - name: Phoronix - install EPEL
-      ansible.builtin.package:
-        name: epel-release
-        state: latest
+    # Enable PowerTools/CRB
+    - name: Ensure the powertools repository is enabled
+      community.general.dnf_config_manager:
+        name: powertools
+        state: enabled
+      when: ansible_facts['distribution_major_version'] | int == 8
 
-    - name: Phoronix - install dependencies
-      yum:
-        name:
-          - phoronix-test-suite
-          - libxml2-devel
-          - uuid-devel
-          - libuuid-devel
-          - bzip2-devel
-          - zlib-devel
-          - meson
-          - xz-devel
-          - sqlite-devel
-          - readline-devel
-          - wireguard-tools
-      register: phoronix_pkgs
+    - name: Ensure the crb repository is enabled
+      community.general.dnf_config_manager:
+        name: crb
+        state: enabled
+      when: ansible_facts['distribution_major_version'] | int > 8
 
-    - name: Phoronix - setup. Step 2.a
-      yum:
-        name:
-          - glfw-devel
-      when: ansible_architecture == "x86_64"
+    # Setup
+    - name: Increase open file limits
+      ansible.posix.sysctl:
+        name: fs.file-max
+        value: 1000000
+        state: present
 
-    - name: Phoronix - use EL10 Python sklearn package name
-      ansible.builtin.replace:
-        path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
-        regexp: 'python-scikit-learn'
-        replace: 'python3-scikit-learn'
-      when: ansible_facts['distribution_major_version'] | int >= 10
+    - name: Phoronix - create work dir
+      ansible.builtin.file:
+        path: "{{ test_phoronix['folder'] }}"
+        state: directory
+        mode: "0755"
 
-    - name: Phoronix - remove unavailable EL10 SDL_sound dependency
-      ansible.builtin.replace:
-        path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
-        regexp: ' SDL_sound-devel'
-        replace: ''
-      when: ansible_facts['distribution_major_version'] | int >= 10
+    - name: Phoronix - df
+      shell: "df -BG --output=avail {{ test_phoronix['folder'] }} | grep -o '[0-9]*'"
+      register: df_output
 
-    - name: Phoronix - copy config on SUT
-      copy:
-        src: "{{ lts_tests_dir }}/phoronix/sources/phoronix-test-suite.xml"
-        dest: "/etc/phoronix-test-suite.xml"
-        mode: "0644"
-
-    - name: Phoronix - set folder path
-      replace:
-        path: /etc/phoronix-test-suite.xml
-        regexp: '~/'
-        replace: "{{ test_phoronix['folder'] }}/"
-
-    # Test
-    - name: Phoronix - install & run tests
-      shell: "phoronix-test-suite batch-benchmark {{ test_phoronix['tests'][ansible_facts['distribution_major_version'] | int] | join(' ') }} |
-        tee {{ (hcs_scratch_dir + '/phoronix.tee.log') | quote }}"
-      environment:
-        FORCE_TIMES_TO_RUN: 1
-      register: output
-
-    - name: Phoronix - copy log
-      local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/phoronix.log"
-
-    - name: Phoronix - report failure to runner
+    - name: Phoronix - report insufficient disk space to runner
       ansible.builtin.debug:
-        msg: "HCS_RESULT: fail phoronix batch-benchmark exited rc={{ output.rc }}"
-      when: output.rc | default(0) != 0
+        msg:
+          "HCS_UNSUPPORTED: insufficient disk space for Phoronix
+          ({{ df_output.stdout }}G available, {{ test_phoronix['need_space'] }}G
+          required in {{ test_phoronix['folder'] }}; lower phoronix_need_space
+          or point test_phoronix.folder at a larger filesystem)"
+      when: df_output.stdout|int < test_phoronix['need_space']|int
 
-    - name: Phoronix - get results
-      command: ls -1 {{ test_phoronix['folder'] }}/.phoronix-test-suite/test-results/
-      register: results
+    - name: Phoronix - error log
+      local_action: copy content="Skipped, not enough free disk space" dest="{{ lts_logs_dir }}/phoronix.log"
+      when: df_output.stdout|int < test_phoronix['need_space']|int
 
-    - name: Phoronix - convert results to PDF
-      shell: "phoronix-test-suite result-file-to-pdf {{ item }} | grep -oP '/(.*.pdf)' | sed 's/ //'"
-      with_items: "{{ results.stdout_lines }}"
-      register: pdf_reports
+    - when: df_output.stdout|int >= test_phoronix['need_space']|int
+      block:
+        - name: Phoronix - record packages present before testing
+          ansible.builtin.package_facts:
 
-    - name: Phoronix - convert results to JSON
-      shell: "phoronix-test-suite result-file-to-json {{ item }} | grep -oP '/(.*.json)' | sed 's/ //'"
-      with_items: "{{ results.stdout_lines }}"
-      register: json_reports
+        - name: Phoronix - note pre-test package set
+          # phoronix-test-suite installs benchmark dependencies on its own;
+          # diffing against this snapshot at cleanup removes exactly what the
+          # test added, instead of a stale hardcoded approximation.
+          ansible.builtin.set_fact:
+            phoronix_pkgs_before: "{{ ansible_facts.packages.keys() | list }}"
 
-    - name: Phoronix - copy PDF reports
-      fetch:
-        src: "{{ item.stdout }}"
-        dest: "{{ lts_logs_dir }}"
-      with_items: "{{ pdf_reports.results }}"
+        - name: Phoronix - install EPEL
+          ansible.builtin.package:
+            name: epel-release
+            state: latest
 
-    - name: Phoronix - copy JSON reports
-      fetch:
-        src: "{{ item.stdout }}"
-        dest: "{{ lts_logs_dir }}"
-      with_items: "{{ json_reports.results }}"
+        - name: Phoronix - install dependencies
+          yum:
+            name:
+              - phoronix-test-suite
+              - libxml2-devel
+              - uuid-devel
+              - libuuid-devel
+              - bzip2-devel
+              - zlib-devel
+              - meson
+              - xz-devel
+              - sqlite-devel
+              - readline-devel
+              - wireguard-tools
 
-    # Cleanup
-    - name: Phoronix - cleanup. Step 1
-      file:
-        path: '/etc/phoronix-test-suite.xml'
-        state: absent
+        - name: Phoronix - setup. Step 2.a
+          yum:
+            name:
+              - glfw-devel
+          when: ansible_architecture == "x86_64"
 
-    - name: Phoronix - cleanup. Step 2
-      yum:
-        name:
-          - phoronix-test-suite
-          - uuid-devel
-          - snappy-devel
-          - gflags-devel
-          - erlang
-          - opencl-headers
-          - glfw-devel
-          - yasm
-          - nasm
-          - p7zip
-          - p7zip-plugins
-          - meson
-          - opencv-devel
-          - google-benchmark-devel
-          - expat-devel
-        state: removed
-      when: phoronix_pkgs.changed
+        - name: Phoronix - use EL10 Python sklearn package name
+          ansible.builtin.replace:
+            path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
+            regexp: 'python-scikit-learn'
+            replace: 'python3-scikit-learn'
+          when: ansible_facts['distribution_major_version'] | int >= 10
+
+        - name: Phoronix - remove unavailable EL10 SDL_sound dependency
+          ansible.builtin.replace:
+            path: /usr/share/phoronix-test-suite/pts-core/external-test-dependencies/xml/fedora-packages.xml
+            regexp: ' SDL_sound-devel'
+            replace: ''
+          when: ansible_facts['distribution_major_version'] | int >= 10
+
+        - name: Phoronix - copy config on SUT
+          copy:
+            src: "{{ lts_tests_dir }}/phoronix/sources/phoronix-test-suite.xml"
+            dest: "/etc/phoronix-test-suite.xml"
+            mode: "0644"
+
+        - name: Phoronix - set folder path
+          replace:
+            path: /etc/phoronix-test-suite.xml
+            regexp: '~/'
+            replace: "{{ test_phoronix['folder'] }}/"
+
+        # Test
+        - name: Phoronix - install & run tests
+          # pipefail: without it the trailing tee masks the benchmark's exit
+          # code and a failed batch-benchmark would still report rc=0.
+          shell: "set -o pipefail; phoronix-test-suite batch-benchmark {{ test_phoronix['tests'][ansible_facts['distribution_major_version'] | int] | join(' ') }} |
+            tee {{ (hcs_scratch_dir + '/phoronix.tee.log') | quote }}"
+          args:
+            executable: /bin/bash
+          environment:
+            FORCE_TIMES_TO_RUN: 1
+          register: output
+
+        - name: Phoronix - copy log
+          local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/phoronix.log"
+
+        - name: Phoronix - report failure to runner
+          ansible.builtin.debug:
+            msg: "HCS_RESULT: fail phoronix batch-benchmark exited rc={{ output.rc }}"
+          when: output.rc | default(0) != 0
+
+        - name: Phoronix - get results
+          command: ls -1 {{ test_phoronix['folder'] }}/.phoronix-test-suite/test-results/
+          register: results
+
+        - name: Phoronix - convert results to PDF
+          shell: "phoronix-test-suite result-file-to-pdf {{ item }} | grep -oP '/(.*.pdf)' | sed 's/ //'"
+          with_items: "{{ results.stdout_lines }}"
+          register: pdf_reports
+
+        - name: Phoronix - convert results to JSON
+          shell: "phoronix-test-suite result-file-to-json {{ item }} | grep -oP '/(.*.json)' | sed 's/ //'"
+          with_items: "{{ results.stdout_lines }}"
+          register: json_reports
+
+        - name: Phoronix - copy PDF reports
+          fetch:
+            src: "{{ item.stdout }}"
+            dest: "{{ lts_logs_dir }}"
+          with_items: "{{ pdf_reports.results }}"
+
+        - name: Phoronix - copy JSON reports
+          fetch:
+            src: "{{ item.stdout }}"
+            dest: "{{ lts_logs_dir }}"
+          with_items: "{{ json_reports.results }}"
+
+        # Cleanup
+        - name: Phoronix - cleanup. Step 1
+          file:
+            path: '/etc/phoronix-test-suite.xml'
+            state: absent
+
+        - name: Phoronix - record packages present after testing
+          ansible.builtin.package_facts:
+
+        - name: Phoronix - note packages added during testing
+          ansible.builtin.set_fact:
+            phoronix_added_pkgs: "{{ ansible_facts.packages.keys() | list | difference(phoronix_pkgs_before) }}"
+
+        - name: Phoronix - remove only packages added during testing
+          ansible.builtin.package:
+            name: "{{ phoronix_added_pkgs }}"
+            state: absent
+          when: phoronix_added_pkgs | length > 0
