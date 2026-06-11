@@ -1,5 +1,26 @@
 ---
 
+- name: Test Hardware Detection - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: Test Hardware Detection - note which packages HCS will install
+  # Remove only these afterwards; removing the full list would uninstall
+  # tools the operator already had.
+  ansible.builtin.set_fact:
+    hw_detection_new_pkgs: "{{ ['dmidecode', 'pciutils', 'lshw', 'lsscsi', 'util-linux'] | difference(ansible_facts.packages.keys() | list) }}"
+
+- name: Test Hardware Detection - install report tools
+  # The inventory report is required certification evidence; without these
+  # tools the script used to emit empty sections and still exit 0.
+  ansible.builtin.package:
+    name:
+      - dmidecode
+      - pciutils
+      - lshw
+      - lsscsi
+      - util-linux
+    state: present
+
 - name: Test Hardware Detection - run test
   shell: "{{ sut_tests_dir }}/hw_detection/run_test.sh"
   register: output
@@ -14,3 +35,9 @@
   ansible.builtin.debug:
     msg: "HCS_RESULT: fail hw_detection run_test.sh exited rc={{ output.rc }}"
   when: output.rc | default(0) != 0
+
+- name: Test Hardware Detection - remove only packages HCS installed
+  ansible.builtin.package:
+    name: "{{ hw_detection_new_pkgs }}"
+    state: absent
+  when: hw_detection_new_pkgs | length > 0

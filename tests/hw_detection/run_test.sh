@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 
-DMIDECODE="/usr/sbin/dmidecode"
+# The inventory report is certification evidence: missing tools or an
+# unreadable SMBIOS must fail loudly, not produce an empty report that passes.
+PATH="$PATH:/usr/sbin:/sbin"
+report_ok=true
+
+for tool in dmidecode lspci lshw lsscsi lsblk; do
+  if ! command -v "$tool" > /dev/null 2>&1; then
+    echo "ERROR: required tool is missing: $tool"
+    report_ok=false
+  fi
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "ERROR: hw_detection must run as root: dmidecode reads SMBIOS tables via /dev/mem."
+  echo "Run the suite from a privileged shell, or target the SUT as root over SSH."
+  report_ok=false
+fi
+
+if [ "$report_ok" != "true" ]; then
+  exit 1
+fi
+
+DMIDECODE="$(command -v dmidecode)"
 RED='\033[0;31m'
 NC="\033[0m"
 AQUA="\033[0;96m"
@@ -48,6 +70,12 @@ function block_devices(){
   echo ""
 }
 
+# SMBIOS must actually be readable; an empty DMI report is not evidence.
+if ! "${DMIDECODE}" -t system > /dev/null 2>&1; then
+  echo "ERROR: dmidecode cannot read the SMBIOS/DMI tables on this system."
+  exit 1
+fi
+
 printf "${AQUA}System Hardware Components report${NC}\n"
 dmi_info "bios" "BIOS Report"
 dmi_info "system" "System Report"
@@ -69,3 +97,5 @@ printf "${AQUA}Block Devices${NC}\n"
 echo "Note: you may identify whether disk is SDD or HDD by ROTA parameter"
 echo "1 - HDD, 0 - SSD"
 block_devices
+
+exit 0
