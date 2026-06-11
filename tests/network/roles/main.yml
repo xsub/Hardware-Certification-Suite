@@ -5,13 +5,27 @@
     msg: "HCS_UNSUPPORTED: network test needs a distinct SUT (local/single-host run)"
   when: not network_is_remote | bool
 
+- name: Network - report missing endpoint addresses to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail cannot determine LTS/SUT addresses (no SSH_CONNECTION in the Ansible session)"
+  when: network_is_remote | bool and (lts_ip | length == 0 or sut_ip | length == 0)
+
 - name: Network - run against the SUT
-  when: network_is_remote | bool
+  when: network_is_remote | bool and lts_ip | length > 0 and sut_ip | length > 0
   block:
     - name: Network - enable EPEL
       ansible.builtin.package:
         name: epel-release
         state: present
+
+    - name: Network - record packages already installed
+      ansible.builtin.package_facts:
+
+    - name: Network - note which packages HCS will install
+      # Remove only these afterwards; removing the full list would uninstall
+      # packages the operator already had.
+      ansible.builtin.set_fact:
+        network_new_pkgs: "{{ ['iperf3', 'ethtool', 'net-tools', 'lshw', 'bc'] | difference(ansible_facts.packages.keys() | list) }}"
 
     - name: Network - install tools
       # yum/dnf (not ansible.builtin.package) so enablerepo is honored; the
@@ -20,7 +34,6 @@
         name: [iperf3, ethtool, net-tools, lshw, bc]
         state: present
         enablerepo: epel
-      register: network_pkgs
 
     # Required to run tests in parallel on opennebula
     - name: Network - ensure iperf3 is not already running
@@ -55,8 +68,8 @@
         msg: "HCS_RESULT: fail network run_test.sh exited rc={{ output.rc }}"
       when: output.rc | default(0) != 0
 
-    - name: Network - cleanup
+    - name: Network - remove only packages HCS installed
       ansible.builtin.package:
-        name: [iperf3]
+        name: "{{ network_new_pkgs }}"
         state: absent
-      when: run_on_nebula is not defined and network_pkgs.changed
+      when: run_on_nebula is not defined and network_new_pkgs | length > 0

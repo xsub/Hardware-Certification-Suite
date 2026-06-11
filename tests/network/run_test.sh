@@ -59,8 +59,8 @@ iperf3_test() {
     # End clearing
 
     # Stopping firewall
-    service firewalld stop > /dev/null 2>&1
-    sut_command 'service firewalld stop > /dev/null 2>&1'
+    systemctl stop firewalld > /dev/null 2>&1
+    sut_command 'systemctl stop firewalld > /dev/null 2>&1'
 
     if [ "$TARGET_SPEED" != "false" ] && [ "$TARGET_SPEED" -gt 0 ]; then
         device_speed=$TARGET_SPEED
@@ -196,8 +196,8 @@ if [ "$global_result" == "true" ]; then
     done
 
     # Starting firewall
-    service firewalld start > /dev/null 2>&1
-    sut_command 'service firewalld start > /dev/null 2>&1 &'
+    systemctl start firewalld > /dev/null 2>&1
+    sut_command 'systemctl start firewalld > /dev/null 2>&1 &'
 fi
 
 info "For more information see the network.log file in the run logs directory."
