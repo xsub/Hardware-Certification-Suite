@@ -21,6 +21,9 @@ MODEL=${HCS_AI_LLM_MODEL:-}
 MODEL_URL=${HCS_AI_LLM_MODEL_URL:-https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf}
 MODEL_DIR=${HCS_AI_LLM_MODEL_DIR:-/tmp/hcs-ai-llm/models}
 DOWNLOAD_MODEL=${HCS_AI_LLM_DOWNLOAD_MODEL:-true}
+# Optional sha256 of the GGUF; when set, configured/cached/downloaded models
+# are verified before use so benchmark evidence is tied to a known artifact.
+MODEL_SHA256=${HCS_AI_LLM_MODEL_SHA256:-}
 
 SOURCE_URL=${HCS_AI_LLM_SOURCE_URL:-https://github.com/ggml-org/llama.cpp.git}
 SOURCE_REF=${HCS_AI_LLM_SOURCE_REF:-master}
@@ -202,9 +205,23 @@ function ensure_binary() {
   BUILD_MODE="source"
 }
 
+function model_checksum_ok() {
+  # $1 = file to check. True when no checksum is configured or it matches.
+  local path=$1 actual
+  [ -n "$MODEL_SHA256" ] || return 0
+  actual=$(sha256sum "$path" | awk '{print $1}')
+  if [ "$actual" != "$MODEL_SHA256" ]; then
+    log "Model checksum mismatch for $path (expected $MODEL_SHA256, got $actual)"
+    return 1
+  fi
+  log "Model sha256 verified: $actual"
+  return 0
+}
+
 function ensure_model() {
   if [ -n "$MODEL" ]; then
     [ -f "$MODEL" ] || unsupported "configured model not found: $MODEL; set ai_llm_model to a readable GGUF file"
+    model_checksum_ok "$MODEL" || fail "configured model failed sha256 verification: $MODEL" 3
     MODEL_PATH="$MODEL"
     MODEL_SOURCE="configured"
     log "Using configured model: $MODEL_PATH"
@@ -213,9 +230,13 @@ function ensure_model() {
 
   MODEL_PATH="$MODEL_DIR/$(basename "$MODEL_URL")"
   if [ -f "$MODEL_PATH" ]; then
-    MODEL_SOURCE="cached"
-    log "Using cached model: $MODEL_PATH"
-    return
+    if model_checksum_ok "$MODEL_PATH"; then
+      MODEL_SOURCE="cached"
+      log "Using cached model: $MODEL_PATH"
+      return
+    fi
+    log "Cached model failed verification; removing and re-downloading"
+    rm -f "$MODEL_PATH"
   fi
 
   is_true "$DOWNLOAD_MODEL" || \
@@ -233,6 +254,10 @@ function ensure_model() {
   if [ $? -ne 0 ] || [ ! -s "$MODEL_PATH.part" ]; then
     rm -f "$MODEL_PATH.part"
     unsupported "failed to download model from $MODEL_URL (no network?); set ai_llm_model to a local GGUF for air-gapped runs"
+  fi
+  if ! model_checksum_ok "$MODEL_PATH.part"; then
+    rm -f "$MODEL_PATH.part"
+    fail "downloaded model failed sha256 verification (corrupted or tampered download from $MODEL_URL)" 3
   fi
   mv "$MODEL_PATH.part" "$MODEL_PATH"
   MODEL_SOURCE="downloaded"

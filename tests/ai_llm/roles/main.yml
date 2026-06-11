@@ -12,16 +12,24 @@
     - "{{ test_ai_llm['source_dir'] | dirname }}"
     - "{{ test_ai_llm['model_dir'] }}"
 
+- name: AI inference - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: AI inference - note which packages HCS will install
+  # Remove only these afterwards; removing a fixed list would uninstall
+  # toolchain packages the operator already had.
+  ansible.builtin.set_fact:
+    ai_llm_new_pkgs: "{{ ['git', 'cmake', 'gcc-c++', 'make'] | difference(ansible_facts.packages.keys() | list) }}"
+
 - name: AI inference - install build dependencies
   become: true
-  ansible.builtin.yum:
+  ansible.builtin.package:
     name:
       - git
       - cmake
       - gcc-c++
       - make
     state: present
-  register: ai_llm_build_pkgs
 
 - name: AI inference - run test
   ansible.builtin.shell: "{{ sut_tests_dir }}/ai_llm/run_test.sh"
@@ -35,6 +43,7 @@
     HCS_AI_LLM_CMAKE_EXTRA: "{{ test_ai_llm['cmake_extra'] }}"
     HCS_AI_LLM_MODEL: "{{ test_ai_llm['model'] }}"
     HCS_AI_LLM_MODEL_URL: "{{ test_ai_llm['model_url'] }}"
+    HCS_AI_LLM_MODEL_SHA256: "{{ test_ai_llm['model_sha256'] }}"
     HCS_AI_LLM_MODEL_DIR: "{{ test_ai_llm['model_dir'] }}"
     HCS_AI_LLM_DOWNLOAD_MODEL: "{{ test_ai_llm['download_model'] }}"
     HCS_AI_LLM_SOURCE_URL: "{{ test_ai_llm['source_url'] }}"
@@ -68,11 +77,9 @@
     mode: "0644"
   delegate_to: localhost
 
-- name: AI inference - uninstall build dependencies HCS installed
+- name: AI inference - remove only packages HCS installed
   become: true
-  ansible.builtin.yum:
-    name:
-      - cmake
-      - gcc-c++
+  ansible.builtin.package:
+    name: "{{ ai_llm_new_pkgs }}"
     state: absent
-  when: ai_llm_build_pkgs.changed
+  when: ai_llm_new_pkgs | length > 0

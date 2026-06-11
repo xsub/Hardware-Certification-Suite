@@ -118,6 +118,8 @@ test_ai_llm:
   # Point model at a local GGUF for air-gapped runs; otherwise model_url is downloaded.
   model: "{{ ai_llm_model|default('') }}"
   model_url: "{{ ai_llm_model_url|default('https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf') }}"
+  # Optional sha256 of the GGUF; when set, the model is verified before use.
+  model_sha256: "{{ ai_llm_model_sha256|default('') }}"
   model_dir: "{{ ai_llm_model_dir|default(hcs_cache_dir + '/ai-llm/models') }}"
   download_model: "{{ ai_llm_download_model|default(true) }}"
   source_url: "{{ ai_llm_source_url|default('https://github.com/ggml-org/llama.cpp.git') }}"

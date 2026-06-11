@@ -13,9 +13,11 @@
     name: "{{ 'powertools' if ansible_facts['distribution_major_version'] | int == 8 else 'crb' }}"
     state: enabled
 
-- name: TEST LTP - install packages
-  yum:
-    name:
+- name: TEST LTP - define build packages
+  # Real rpm names (pkgconf-pkg-config, not the pkg-config provide) so the
+  # installed-before diff below matches what rpm actually reports.
+  ansible.builtin.set_fact:
+    ltp_build_pkg_list:
       - automake
       - make
       - gcc
@@ -30,7 +32,7 @@
       - libtirpc-devel
       - perl-JSON
       - perl-libwww-perl
-      - pkg-config
+      - pkgconf-pkg-config
       - pkgconf
       - libmnl-devel
       - bison
@@ -38,9 +40,22 @@
       - m4
       - kernel-headers
       - glibc-headers
+
+- name: TEST LTP - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: TEST LTP - note which packages HCS will install
+  # Remove only these afterwards. The old cleanup removed the whole list when
+  # any one package was new — on a stock SUT that uninstalled core packages
+  # like findutils and iproute (plus whatever depended on them).
+  ansible.builtin.set_fact:
+    ltp_new_pkgs: "{{ ltp_build_pkg_list | difference(ansible_facts.packages.keys() | list) }}"
+
+- name: TEST LTP - install packages
+  ansible.builtin.package:
+    name: "{{ ltp_build_pkg_list }}"
     state: present
     update_cache: true
-  register: ltp_pkgs
 
 - name: TEST LTP - clone repo
   git:
@@ -68,31 +83,8 @@
     msg: "HCS_RESULT: fail ltp run_test.sh exited rc={{ output.rc }}"
   when: output.rc | default(0) != 0
 
-- name: TEST LTP - cleanup packages HCS installed
-  yum:
-    name:
-      - automake
-      - make
-      - gcc
-      - git
-      - asciidoc
-      - autoconf
-      - clang
-      - findutils
-      - iproute
-      - numactl-devel
-      - libtirpc
-      - libtirpc-devel
-      - perl-JSON
-      - perl-libwww-perl
-      - pkg-config
-      - pkgconf
-      - libmnl-devel
-      - bison
-      - flex
-      - m4
-      - kernel-headers
-      - glibc-headers
-    skip_broken: true
+- name: TEST LTP - remove only packages HCS installed
+  ansible.builtin.package:
+    name: "{{ ltp_new_pkgs }}"
     state: absent
-  when: ltp_pkgs.changed
+  when: ltp_new_pkgs | length > 0
