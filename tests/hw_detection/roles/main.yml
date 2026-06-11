@@ -31,10 +31,19 @@
     dest: "{{ lts_logs_dir }}/hw_detection.log"
   delegate_to: localhost
 
+- name: Test Hardware Detection - collect unsupported marker
+  ansible.builtin.set_fact:
+    hcs_hw_detection_unsupported: "{{ output.stdout_lines | select('match', '^HCS_UNSUPPORTED:') | list | first | default('') }}"
+
+- name: Test Hardware Detection - report unsupported status to runner
+  ansible.builtin.debug:
+    msg: "{{ hcs_hw_detection_unsupported }}"
+  when: hcs_hw_detection_unsupported | length > 0
+
 - name: Test Hardware Detection - report failure to runner
   ansible.builtin.debug:
     msg: "HCS_RESULT: fail hw_detection run_test.sh exited rc={{ output.rc }}"
-  when: output.rc | default(0) != 0
+  when: hcs_hw_detection_unsupported | length == 0 and output.rc | default(0) != 0
 
 - name: Test Hardware Detection - remove only packages HCS installed
   ansible.builtin.package:

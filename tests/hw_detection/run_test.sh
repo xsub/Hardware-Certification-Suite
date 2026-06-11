@@ -22,6 +22,14 @@ if [ "$report_ok" != "true" ]; then
   exit 1
 fi
 
+# A container is not certifiable hardware: there are no SMBIOS/DMI tables to
+# inventory. Report unsupported (CI smoke-tests the pipeline in containers);
+# VMs and bare metal still hard-fail above/below when evidence is unreadable.
+if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || grep -qa 'container=' /proc/1/environ 2>/dev/null; then
+  echo "HCS_UNSUPPORTED: hw_detection needs host hardware; containers expose no SMBIOS/DMI tables"
+  exit 0
+fi
+
 DMIDECODE="$(command -v dmidecode)"
 RED='\033[0;31m'
 NC="\033[0m"
