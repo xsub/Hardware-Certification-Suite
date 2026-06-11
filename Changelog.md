@@ -53,6 +53,31 @@ Ansible tests:
 - ai_llm: optional `ai_llm_model_sha256` verifies configured, cached, and
   downloaded GGUF models before benchmarking.
 
+Second wave (same day):
+
+- Reports list **required tests not exercised** — required-scope tests with
+  no pass/fail verdict (unsupported, skipped, not run, disabled, or filtered
+  by `--test`) — in `run.summary.json`, `run.report.txt`, the recap, and the
+  PDF; an explicit `HCS_RESULT: fail` now also overrides an earlier pass
+  marker within a step.
+- Startup warnings for unknown `hcs-runner.yml` keys and for preset durations
+  silently clamped by the profile cap; `configure` validates `repeat >= 1`
+  and warns when disabling a required test; reusing a configured sandbox
+  warns before overwriting earlier reports; reports record the inventory.
+- The whole `127.0.0.0/8` range and case-insensitive loopback names infer the
+  local connection.
+- Network test hardening: firewalld state is captured and restored exactly
+  (previously it was started unconditionally, in the background, even where
+  it had been off — and a host without firewalld failed the test); device
+  switching uses `nmcli` with an `ifdown`/`ifup` fallback for EL9+ minimal
+  installs; the SUT SSH user follows the Ansible connection user.
+- Supply-chain: llama.cpp pinned to release `b9601`, gpu-burn to its
+  2026-05-31 master commit (no upstream tags); clone logic fetches commit
+  SHAs explicitly instead of falling back to an unpinned default branch, and
+  both result JSONs record `source_ref`/`source_commit`.
+- cpu cleanup now covers the EPEL repo it installs; LTP removes `/opt/ltp`
+  at the end; sandbox/log directories are created `0750`.
+
 ## 2026-06-09 - AI inference test (llama.cpp)
 
 - Added an optional `ai_llm` runner/Ansible test that benchmarks AI inference

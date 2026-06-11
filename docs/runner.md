@@ -535,6 +535,14 @@ appear as `not_run` with the reason. When the preset declares manual tests
 not executed by the runner, so automated-only evidence states what it does not
 cover.
 
+Reports also call out **required tests not exercised**: any required-scope
+test that produced no pass/fail verdict in the run — unsupported, skipped,
+never run, disabled in the preset, or filtered out with `--test` — is listed
+in `run.summary.json` (`required_unexercised`), the text report, the console
+recap, and the PDF. The runner additionally warns at startup about unknown
+`hcs-runner.yml` keys (typos would otherwise be ignored silently) and about
+preset durations above the profile cap.
+
 ## Remote LTS/SUT
 
 Use remote mode when the controller and SUT are different machines.

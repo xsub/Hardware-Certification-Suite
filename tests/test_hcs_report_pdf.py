@@ -120,6 +120,11 @@ class WritePdfReportTests(unittest.TestCase):
                     ("usb", "required", "Interactive physical-port validation via interactive.yml."),
                     ("pxe", "required", "Interactive boot/network validation via interactive.yml."),
                 ],
+                inventory="10.0.0.5,",
+                required_unexercised=[
+                    ("network", "unsupported: needs a distinct SUT <single-host>"),
+                    ("phoronix", "not_run: interrupted"),
+                ],
             )
 
             self.assertTrue(written)
