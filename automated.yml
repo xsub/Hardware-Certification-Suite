@@ -124,6 +124,14 @@
           ansible.builtin.include_tasks: "{{ lts_tests_dir }}/ai_llm/roles/main.yml"
 
     # lve limits/cagefs
+    - name: CL limits unsupported on AlmaLinux
+      tags: cllimits
+      ansible.builtin.debug:
+        msg: "HCS_UNSUPPORTED: cllimits validates CloudLinux LVE/CageFS and does not apply to {{ ansible_distribution }}"
+      # Without this marker a skipped include left a clean recap and the
+      # runner recorded a test that never ran as passed.
+      when: ansible_distribution == 'AlmaLinux'
+
     - name: CL limits
       tags: cllimits
       when: ansible_distribution != 'AlmaLinux'

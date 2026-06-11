@@ -1,5 +1,14 @@
 ---
 
+- name: Test lve/cagefs - record packages already installed
+  ansible.builtin.package_facts:
+
+- name: Test lve/cagefs - note which packages HCS will install
+  # Remove only these afterwards; removing a fixed list would uninstall
+  # packages the operator already had.
+  ansible.builtin.set_fact:
+    cllimits_new_pkgs: "{{ ['fio', 'epel-release', 'cagefs', 'lve-utils', 'psmisc', 'stress-ng'] | difference(ansible_facts.packages.keys() | list) }}"
+
 - name: Test lve/cagefs - install packages
   yum:
     name:
@@ -26,11 +35,13 @@
 - name: Test lve/cagefs - copy log
   local_action: copy content="{{ output.stdout }}" dest="{{ lts_logs_dir }}/cllimits.log"
 
-- name: Test lve/cagefs - uninstall packages
+- name: Test lve/cagefs - report failure to runner
+  ansible.builtin.debug:
+    msg: "HCS_RESULT: fail cllimits run_test.sh exited rc={{ output.rc }}"
+  when: output.rc | default(0) != 0
+
+- name: Test lve/cagefs - remove only packages HCS installed
   yum:
-    name:
-      - fio
-      - cagefs
-      - stress-ng
-      - psmisc
+    name: "{{ cllimits_new_pkgs }}"
     state: absent
+  when: cllimits_new_pkgs | length > 0
