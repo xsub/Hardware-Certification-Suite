@@ -12,7 +12,9 @@ SNAP_PACKAGE=${HCS_GPU_BURN_SNAP_PACKAGE:-gpu-burn}
 INSTALL_SNAP=${HCS_GPU_BURN_INSTALL_SNAP:-false}
 REMOVE_SNAP_AFTER=${HCS_GPU_BURN_REMOVE_SNAP_AFTER:-false}
 SOURCE_URL=${HCS_GPU_BURN_SOURCE_URL:-https://github.com/wilicc/gpu-burn.git}
-SOURCE_REF=${HCS_GPU_BURN_SOURCE_REF:-master}
+# Pinned for reproducible certification evidence (upstream has no tags; this
+# is master as of 2026-05-31). Override with gpu_burn_source_ref.
+SOURCE_REF=${HCS_GPU_BURN_SOURCE_REF:-3ead140434da9473582b68452f7115967a7a0581}
 SOURCE_DIR=${HCS_GPU_BURN_SOURCE_DIR:-/tmp/gpu-burn}
 BINARY=${HCS_GPU_BURN_BINARY:-${SOURCE_DIR}/gpu_burn}
 BUILD_FROM_SOURCE=${HCS_GPU_BURN_BUILD_FROM_SOURCE:-true}
@@ -55,6 +57,8 @@ function write_result() {
   "devices": $(json_string "$DEVICES"),
   "mode": $(json_string "$GPU_BURN_MODE"),
   "binary": $(json_string "$BINARY"),
+  "source_ref": $(json_string "$SOURCE_REF"),
+  "source_commit": $(json_string "$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"),
   "snap_package": $(json_string "$SNAP_PACKAGE"),
   "snap_installed_by_hcs": $(json_string "$SNAP_INSTALLED_BY_HCS"),
   "snap_remove_after": $(json_string "$REMOVE_SNAP_AFTER"),
@@ -228,8 +232,12 @@ function ensure_gpu_burn() {
     rm -rf "$SOURCE_DIR"
     log "Cloning GPU Burn from $SOURCE_URL ref $SOURCE_REF"
     if ! git clone --depth 1 --branch "$SOURCE_REF" "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1; then
-      log "Branch-specific clone failed; retrying default branch"
-      git clone --depth 1 "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1 || fail "failed to clone GPU Burn" 2
+      # Tags and branches shallow-clone directly; a commit SHA needs an
+      # explicit fetch. Never fall back to an unpinned default branch.
+      log "Ref clone failed; fetching $SOURCE_REF explicitly"
+      git clone --no-checkout "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1 || fail "failed to clone GPU Burn" 2
+      git -C "$SOURCE_DIR" fetch --depth 1 origin "$SOURCE_REF" >>"$LOG_FILE" 2>&1 || true
+      git -C "$SOURCE_DIR" checkout "$SOURCE_REF" >>"$LOG_FILE" 2>&1 || fail "failed to checkout GPU Burn ref $SOURCE_REF" 2
     fi
   fi
 

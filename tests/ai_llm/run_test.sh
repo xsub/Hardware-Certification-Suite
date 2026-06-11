@@ -26,7 +26,9 @@ DOWNLOAD_MODEL=${HCS_AI_LLM_DOWNLOAD_MODEL:-true}
 MODEL_SHA256=${HCS_AI_LLM_MODEL_SHA256:-}
 
 SOURCE_URL=${HCS_AI_LLM_SOURCE_URL:-https://github.com/ggml-org/llama.cpp.git}
-SOURCE_REF=${HCS_AI_LLM_SOURCE_REF:-master}
+# Pinned for reproducible certification evidence (b9601, 2026-06-11).
+# Override with ai_llm_source_ref to track a different tag/branch/commit.
+SOURCE_REF=${HCS_AI_LLM_SOURCE_REF:-b9601}
 SOURCE_DIR=${HCS_AI_LLM_SOURCE_DIR:-/tmp/hcs-ai-llm/llama.cpp}
 BINARY=${HCS_AI_LLM_BINARY:-${SOURCE_DIR}/build/bin/llama-bench}
 BUILD_FROM_SOURCE=${HCS_AI_LLM_BUILD_FROM_SOURCE:-true}
@@ -104,6 +106,8 @@ function write_result() {
   "gen_tokens_per_second": $(json_number "$tg_ts"),
   "gen_tokens_per_second_stddev": $(json_number "$tg_sd"),
   "binary": $(json_string "$BINARY"),
+  "source_ref": $(json_string "$SOURCE_REF"),
+  "source_commit": $(json_string "$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"),
   "log_file": $(json_string "$LOG_FILE"),
   "bench_json_file": $(json_string "$BENCH_JSON_FILE")
 }
@@ -180,8 +184,12 @@ function ensure_binary() {
     rm -rf "$SOURCE_DIR"
     log "Cloning llama.cpp from $SOURCE_URL ref $SOURCE_REF"
     if ! git clone --depth 1 --branch "$SOURCE_REF" "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1; then
-      log "Branch-specific clone failed; retrying default branch"
-      git clone --depth 1 "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1 || fail "failed to clone llama.cpp" 2
+      # Tags and branches shallow-clone directly; a commit SHA needs an
+      # explicit fetch. Never fall back to an unpinned default branch.
+      log "Ref clone failed; fetching $SOURCE_REF explicitly"
+      git clone --no-checkout "$SOURCE_URL" "$SOURCE_DIR" >>"$LOG_FILE" 2>&1 || fail "failed to clone llama.cpp" 2
+      git -C "$SOURCE_DIR" fetch --depth 1 origin "$SOURCE_REF" >>"$LOG_FILE" 2>&1 || true
+      git -C "$SOURCE_DIR" checkout "$SOURCE_REF" >>"$LOG_FILE" 2>&1 || fail "failed to checkout llama.cpp ref $SOURCE_REF" 2
     fi
   fi
 

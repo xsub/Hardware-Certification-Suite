@@ -94,7 +94,9 @@ test_gpu_burn:
   install_snap: "{{ gpu_burn_install_snap|default(false) }}"
   remove_snap_after: "{{ gpu_burn_remove_snap_after|default(false) }}"
   source_url: "{{ gpu_burn_source_url|default('https://github.com/wilicc/gpu-burn.git') }}"
-  source_ref: "{{ gpu_burn_source_ref|default('master') }}"
+  # Pinned commit (upstream has no tags; master as of 2026-05-31) for
+  # reproducible evidence. Override with gpu_burn_source_ref.
+  source_ref: "{{ gpu_burn_source_ref|default('3ead140434da9473582b68452f7115967a7a0581') }}"
   source_dir: "{{ gpu_burn_source_dir|default(hcs_cache_dir + '/gpu-burn') }}"
   binary: "{{ gpu_burn_binary|default(hcs_cache_dir + '/gpu-burn/gpu_burn') }}"
   build_from_source: "{{ gpu_burn_build_from_source|default(true) }}"
@@ -123,7 +125,9 @@ test_ai_llm:
   model_dir: "{{ ai_llm_model_dir|default(hcs_cache_dir + '/ai-llm/models') }}"
   download_model: "{{ ai_llm_download_model|default(true) }}"
   source_url: "{{ ai_llm_source_url|default('https://github.com/ggml-org/llama.cpp.git') }}"
-  source_ref: "{{ ai_llm_source_ref|default('master') }}"
+  # Pinned release tag (2026-06-11) for reproducible evidence. Override with
+  # ai_llm_source_ref to track a different tag/branch/commit.
+  source_ref: "{{ ai_llm_source_ref|default('b9601') }}"
   source_dir: "{{ ai_llm_source_dir|default(hcs_cache_dir + '/llama.cpp') }}"
   binary: "{{ ai_llm_binary|default(hcs_cache_dir + '/llama.cpp/build/bin/llama-bench') }}"
   build_from_source: "{{ ai_llm_build_from_source|default(true) }}"
