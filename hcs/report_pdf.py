@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 try:
     from reportlab.lib.colors import HexColor, white
@@ -81,6 +82,8 @@ _STATUS_BADGE = {
     "passed": ("PASSED", ATLANTIS_DARK, white),
     "passed_with_warnings": ("PASSED WITH WARNINGS", CANDLELIGHT, BLACK_PEARL),
     "failed": ("FAILED", SUNBURNT, white),
+    "interrupted": ("INTERRUPTED — INCOMPLETE", CANDLELIGHT_DARK, white),
+    "dry_run": ("DRY RUN — NO TESTS EXECUTED", SLATE, white),
 }
 
 _STATUS_TEXT_COLOR = {
@@ -88,6 +91,7 @@ _STATUS_TEXT_COLOR = {
     "failed": SUNBURNT,
     "unsupported": CANDLELIGHT_DARK,
     "skipped": SLATE,
+    "not_run": SLATE,
 }
 
 
@@ -130,6 +134,7 @@ def write_pdf_report(
     counts: dict[str, int],
     total_seconds: float,
     version: str,
+    manual_tests: Sequence[tuple[str, str, str]] = (),
 ) -> bool:
     """Write a branded PDF report. Returns False if reportlab is unavailable."""
     if not REPORTLAB_AVAILABLE:
@@ -182,14 +187,17 @@ def write_pdf_report(
             f"{counts.get('passed', 0)} passed · {counts.get('failed', 0)} failed · "
             f"{counts.get('unsupported', 0)} unsupported   ·   {total} tests · {_human_duration(total_seconds)}"
         )
+        if counts.get("not_run"):
+            summary += f"   ·   {counts['not_run']} not run"
         c.setFillColor(HexColor(SLATE))
         c.setFont(fonts["light"], 9.5)
         c.drawString(18 * mm + badge_w + 6 * mm, badge_y + 3.3 * mm, summary)
 
-        # Meta block.
+        # Meta block. The facts describe the controller (runner host), which is
+        # the SUT only for local runs — label them truthfully for SIG review.
         meta = [
-            ("System", system_title),
-            ("Operating system", facts.get("OS", "—")),
+            ("Controller system", system_title),
+            ("Controller OS", facts.get("OS", "—")),
             ("Run ID", run_id),
             ("Profile", profile),
             ("Preset", preset_name or "—"),
@@ -348,14 +356,18 @@ def write_pdf_report(
     recap = (
         f"<b>{counts.get('passed', 0)} passed</b>, {counts.get('failed', 0)} failed, "
         f"{counts.get('unsupported', 0)} unsupported, {counts.get('skipped', 0)} skipped"
-        f" — total {total_seconds:.1f}s"
     )
+    if counts.get("not_run"):
+        recap += f", {counts['not_run']} not run"
+    recap += f" — total {total_seconds:.1f}s"
     story.append(Paragraph(recap, styles["body"]))
 
+    # xml_escape(): reasons are arbitrary role/runner text; reportlab would
+    # reject stray <...> sequences and the whole report would be skipped.
     notable = [
         r
         for r in results
-        if str(r.get("status")) in {"failed", "unsupported"} and r.get("status_reason")
+        if str(r.get("status")) in {"failed", "unsupported", "not_run"} and r.get("status_reason")
     ]
     if notable:
         story.append(Spacer(1, 6 * mm))
@@ -363,8 +375,26 @@ def write_pdf_report(
         for result in notable:
             story.append(
                 Paragraph(
-                    f"<b>{str(result.get('display_name', result.get('test_id', '')))}</b> "
-                    f"({result.get('status')}): {result.get('status_reason')}",
+                    f"<b>{xml_escape(str(result.get('display_name', result.get('test_id', ''))))}</b> "
+                    f"({xml_escape(str(result.get('status')))}): {xml_escape(str(result.get('status_reason')))}",
+                    styles["reason"],
+                )
+            )
+
+    if manual_tests:
+        story.append(Spacer(1, 6 * mm))
+        story.append(Paragraph("Manual tests — not executed by the runner", styles["h2"]))
+        story.append(
+            Paragraph(
+                "The certification policy also requires the interactive tests below "
+                "(run via interactive.yml); this report does not cover them.",
+                styles["reason"],
+            )
+        )
+        for test_id, scope, reason in manual_tests:
+            story.append(
+                Paragraph(
+                    f"<b>{xml_escape(test_id)}</b> ({xml_escape(scope)}): {xml_escape(reason)}",
                     styles["reason"],
                 )
             )

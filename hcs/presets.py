@@ -289,6 +289,29 @@ def preset_test_extra_vars(preset: Mapping[str, object] | None) -> dict[str, dic
     return by_test
 
 
+def preset_manual_tests(preset: Mapping[str, object] | None) -> dict[str, dict[str, object]]:
+    """Manual (interactive) tests the preset declares; surfaced in reports.
+
+    These are not runnable tags — usb/pxe run through interactive.yml — but the
+    evidence must say they exist, or an automated-only report reads as complete.
+    """
+    if preset is None:
+        return {}
+    value = preset.get("manual_tests", {})
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("runner preset manual_tests must be a mapping")
+    manual: dict[str, dict[str, object]] = {}
+    for raw_id, raw_config in value.items():
+        config = raw_config if isinstance(raw_config, Mapping) else {}
+        manual[str(raw_id)] = {
+            "required": config.get("required") is True,
+            "reason": str(config.get("reason", "")),
+        }
+    return manual
+
+
 def mapping_to_str_dict(value: object, name: str) -> dict[str, str]:
     if value is None:
         return {}

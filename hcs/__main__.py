@@ -12,15 +12,17 @@ from rich.markup import escape
 from rich.prompt import Confirm, IntPrompt, Prompt
 import yaml
 
-from .config import DEFAULT_CONFIG_PATH, build_sandbox_paths, config_extra_vars, load_config
+from .config import DEFAULT_CONFIG_PATH, build_sandbox_paths, config_extra_vars, config_str, load_config
 from .presets import (
     DEFAULT_PRESET_NAME,
     DURATION_VAR_BY_TEST,
     PROFILE_ORDER,
     config_default_preset,
     get_preset,
+    parse_duration_seconds,
     preset_base_profile,
     preset_extra_vars,
+    preset_manual_tests,
     preset_positive_int,
     preset_selected_tests,
     preset_str,
@@ -82,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--repeat", type=positive_int, help="Repeat the selected test plan N times")
     run.add_argument("--dry-run", action="store_true", help="Show plan and write dry-run artifacts without executing Ansible")
     run.add_argument("--stop-on-failure", action="store_true")
+    run.add_argument(
+        "--step-timeout",
+        help="Per-step wall-clock limit (e.g. 7200, 90m, 4h); a step exceeding it "
+        "is terminated and recorded as failed. Defaults to run.step_timeout from "
+        "the config, otherwise no limit.",
+    )
     return parser
 
 
@@ -255,11 +263,19 @@ def main(argv: list[str] | None = None) -> int:
             config_vars = config_extra_vars(config)
             preset_vars = preset_extra_vars(preset)
             cli_vars = parse_extra_vars(args.extra_var)
-            extra_vars = {**config_vars, **preset_vars, **cli_vars}
+            extra_vars = {**config_vars, **preset_vars}
             selected_tests = tuple(args.test) if args.test else preset_selected_tests(preset)
             test_profiles = preset_test_profiles(preset)
             test_extra_vars = preset_test_extra_vars(preset)
             test_scopes = preset_test_scopes(preset)
+            manual_tests = preset_manual_tests(preset)
+            step_timeout_raw = args.step_timeout or config_str(config, "run", "step_timeout")
+            step_timeout: float | None = None
+            if step_timeout_raw:
+                parsed_timeout = parse_duration_seconds(str(step_timeout_raw))
+                if parsed_timeout is None or parsed_timeout < 1:
+                    raise ValueError(f"invalid step timeout: {step_timeout_raw}")
+                step_timeout = float(parsed_timeout)
             sandbox_dir = args.sandbox_dir or args.legacy_work_dir or args.legacy_run_dir
             paths = build_sandbox_paths(
                 config=config,
@@ -286,6 +302,9 @@ def main(argv: list[str] | None = None) -> int:
             repeat=repeat,
             dry_run=args.dry_run,
             stop_on_failure=args.stop_on_failure,
+            cli_extra_vars=cli_vars,
+            step_timeout=step_timeout,
+            manual_tests=manual_tests,
         )
         return CertificationRunner(options, console=console).run()
 

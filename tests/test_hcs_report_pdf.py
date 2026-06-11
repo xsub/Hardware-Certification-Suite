@@ -72,6 +72,60 @@ class WritePdfReportTests(unittest.TestCase):
             with out.open("rb") as handle:
                 self.assertTrue(handle.read(5).startswith(b"%PDF"))
 
+    def test_survives_markup_like_reasons_and_renders_extra_statuses(self) -> None:
+        # Reasons are arbitrary role text; <unclosed or </b> sequences used to
+        # abort the paragraph parser and the whole PDF was skipped.
+        results = [
+            dict(SAMPLE_RESULTS[0]),
+            {
+                "step": 2,
+                "test_id": "cpu",
+                "display_name": "CPU stress",
+                "scope": "required",
+                "status": "failed",
+                "status_reason": 'stress-ng said: expected <dict>, got </b> & "str"',
+                "return_code": 2,
+                "duration_seconds": 12.0,
+            },
+            {
+                "step": 3,
+                "test_id": "network",
+                "display_name": "Network",
+                "scope": "required",
+                "status": "not_run",
+                "status_reason": "not executed: run interrupted",
+                "return_code": None,
+                "duration_seconds": 0.0,
+            },
+        ]
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "run.report.pdf"
+            written = write_pdf_report(
+                out,
+                run_id="check-1",
+                profile="check",
+                preset_name="certification",
+                repeat=1,
+                status="interrupted",
+                started_at="2026-06-11T09:00:00Z",
+                finished_at="2026-06-11T09:10:00Z",
+                generated_at="2026-06-11T09:10:01Z",
+                system_title="almalinux@sut.lab",
+                system_facts=SAMPLE_FACTS,
+                results=results,
+                counts={"passed": 1, "failed": 1, "unsupported": 0, "skipped": 0, "not_run": 1},
+                total_seconds=76.2,
+                version="0.2.0",
+                manual_tests=[
+                    ("usb", "required", "Interactive physical-port validation via interactive.yml."),
+                    ("pxe", "required", "Interactive boot/network validation via interactive.yml."),
+                ],
+            )
+
+            self.assertTrue(written)
+            self.assertTrue(out.exists())
+            self.assertGreater(out.stat().st_size, 1000)
+
 
 if __name__ == "__main__":
     unittest.main()

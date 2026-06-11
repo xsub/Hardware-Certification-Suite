@@ -162,6 +162,10 @@ presets:
             ["hw_detection", "containers", "kvm", "cpu", "network", "ltp", "phoronix"],
         )
         self.assertTrue(all(result["scope"] == "required" for result in summary["results"]))
+        self.assertEqual(summary["status"], "dry_run")
+        # The policy's interactive tests must appear in the evidence.
+        self.assertEqual(sorted(summary["manual_tests"]), ["pxe", "usb"])
+        self.assertTrue(all(entry["required"] for entry in summary["manual_tests"].values()))
 
 
 class ConnectionDefaultingTests(unittest.TestCase):

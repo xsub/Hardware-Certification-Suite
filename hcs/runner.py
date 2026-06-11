@@ -10,14 +10,16 @@ import shlex
 import shutil
 import signal
 import subprocess
+import threading
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from rich.columns import Columns
 from rich.console import Console
 from rich.console import Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 from rich.table import Table
@@ -75,12 +77,28 @@ def ansible_subprocess_env(base: Mapping[str, str] | None = None) -> dict[str, s
     return env
 
 
-def terminate_process_group(process: subprocess.Popen) -> None:
-    """Stop a child started with start_new_session and its descendants."""
+# Grace period between SIGTERM and SIGKILL when stopping a child process group.
+TERMINATE_GRACE_SECONDS = 10.0
+
+
+def terminate_process_group(process: subprocess.Popen, *, grace_seconds: float | None = None) -> None:
+    """Stop a child started with start_new_session and its descendants.
+
+    SIGTERM first, then SIGKILL after a grace period: Popen.__exit__ waits on
+    the child, so a child that ignores SIGTERM would otherwise wedge the runner.
+    """
+    grace = TERMINATE_GRACE_SECONDS if grace_seconds is None else grace_seconds
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except (ProcessLookupError, PermissionError):
-        pass
+        return
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
 
 
 UI_REFRESH_SECONDS = 0.1
@@ -107,6 +125,12 @@ class RunnerOptions:
     repeat: int
     dry_run: bool
     stop_on_failure: bool
+    # CLI -e/--extra-var values; applied last so the operator always wins.
+    cli_extra_vars: dict[str, str] = field(default_factory=dict)
+    # Wall-clock limit per step in seconds; the step is terminated and failed.
+    step_timeout: float | None = None
+    # Manual (interactive) tests the preset declares; surfaced in reports.
+    manual_tests: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
 @dataclass
@@ -218,7 +242,7 @@ class RunRecap:
 
 
 def summarize_results(results: list[StepResult]) -> RunRecap:
-    counts = {"passed": 0, "failed": 0, "unsupported": 0, "skipped": 0}
+    counts = {"passed": 0, "failed": 0, "unsupported": 0, "skipped": 0, "not_run": 0}
     for result in results:
         counts[result.status] = counts.get(result.status, 0) + 1
     total = sum(result.duration_seconds for result in results)
@@ -305,6 +329,8 @@ class CertificationRunner:
             extra_vars.update(PROFILES[step_profile].extra_vars)
         extra_vars.update(self.options.extra_vars)
         extra_vars.update(self.options.test_extra_vars.get(test.test_id, {}))
+        # Explicit CLI --extra-var values win over everything, preset included.
+        extra_vars.update(self.options.cli_extra_vars)
         sandbox_extra_vars = {
             "hcs_run_id": self.paths.run_id,
             "hcs_run_timestamp": self.paths.timestamp,
@@ -317,6 +343,8 @@ class CertificationRunner:
             "tests_dir": str(self.paths.sut_tests_dir),
             "phoronix_folder": str(self.paths.phoronix_dir),
             "ltp_clone_path": str(self.paths.ltp_dir),
+            # Anchor the tests tree to the playbook so runs work from any CWD.
+            "lts_tests_dir": str(self.options.playbook.expanduser().resolve().parent / "tests"),
         }
         sandbox_extra_vars.update(extra_vars)
         command.extend(["--extra-vars", json.dumps(sandbox_extra_vars)])
@@ -346,10 +374,13 @@ class CertificationRunner:
             "paths": self.paths.as_dict(),
             "dry_run": self.options.dry_run,
             "stop_on_failure": self.options.stop_on_failure,
+            "step_timeout_seconds": self.options.step_timeout,
             "extra_vars": self.options.extra_vars,
+            "cli_extra_vars": self.options.cli_extra_vars,
             "test_profiles": self.options.test_profiles,
             "test_extra_vars": self.options.test_extra_vars,
             "test_scopes": self.options.test_scopes,
+            "manual_tests": self.options.manual_tests,
             "tests": [test.test_id for test in tests],
             "repeat": self.options.repeat,
             "controller_system": system_summary_payload(self.system_summary),
@@ -385,8 +416,23 @@ class CertificationRunner:
         }
         result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
-    def write_summary(self, results: list[StepResult], started_at: str, finished_at: str) -> None:
-        status = run_status(results)
+    def run_outcome(self, results: list[StepResult], interrupted: bool) -> str:
+        """Headline status; an incomplete or dry run must never read as passed."""
+        if self.options.dry_run:
+            return "dry_run"
+        if interrupted:
+            return "interrupted"
+        return run_status(results)
+
+    def write_summary(
+        self,
+        results: list[StepResult],
+        started_at: str,
+        finished_at: str,
+        *,
+        interrupted: bool = False,
+    ) -> None:
+        status = self.run_outcome(results, interrupted)
         summary = {
             "schema_version": 1,
             "runner_version": __version__,
@@ -394,9 +440,11 @@ class CertificationRunner:
             "profile": self.profile.name,
             "repeat": self.options.repeat,
             "status": status,
+            "interrupted": interrupted,
             "started_at": started_at,
             "finished_at": finished_at,
             "paths": self.paths.as_dict(),
+            "manual_tests": self.options.manual_tests,
             "controller_system": system_summary_payload(self.system_summary),
             "results": [
                 {
@@ -447,6 +495,14 @@ class CertificationRunner:
             }
             for result in results
         ]
+        manual_rows = [
+            (
+                test_id,
+                "required" if info.get("required") else "optional",
+                str(info.get("reason", "")),
+            )
+            for test_id, info in self.options.manual_tests.items()
+        ]
         try:
             written = render_pdf(
                 self.run_dir / "run.report.pdf",
@@ -464,6 +520,7 @@ class CertificationRunner:
                 counts=recap.counts,
                 total_seconds=recap.total_seconds,
                 version=__version__,
+                manual_tests=manual_rows,
             )
         except Exception as exc:  # never fail the run over a report
             self.console.print(f"[yellow]PDF report skipped:[/yellow] {exc}")
@@ -508,6 +565,11 @@ class CertificationRunner:
                 f"{result.test_id:16} {scope:8} {result.status:8} {result.duration_seconds:.1f}s "
                 f"rc={result.return_code} {result.status_reason}"
             )
+        if self.options.manual_tests:
+            lines.extend(["", "Manual tests (not executed by the runner):"])
+            for test_id, info in self.options.manual_tests.items():
+                scope = "required" if info.get("required") else "optional"
+                lines.append(f"  {test_id:16} {scope:8} {info.get('reason', '')}")
         lines.extend(
             [
                 "",
@@ -561,6 +623,7 @@ class CertificationRunner:
         unsupported_reason: str | None = None
         result_status: str | None = None
         result_reason: str | None = None
+        timed_out = threading.Event()
         with console_log.open("w", encoding="utf-8", errors="replace") as handle:
             handle.write(f"$ {shlex.join(command)}\n\n")
             with subprocess.Popen(
@@ -575,6 +638,16 @@ class CertificationRunner:
                 start_new_session=True,
             ) as process:
                 assert process.stdout is not None
+                watchdog: threading.Timer | None = None
+                if self.options.step_timeout:
+
+                    def expire() -> None:
+                        timed_out.set()
+                        terminate_process_group(process)
+
+                    watchdog = threading.Timer(self.options.step_timeout, expire)
+                    watchdog.daemon = True
+                    watchdog.start()
                 last_ui = 0.0
                 try:
                     for line in process.stdout:
@@ -595,14 +668,19 @@ class CertificationRunner:
                             now = time.monotonic()
                             if should_refresh_ui(last_ui, now):
                                 last_ui = now
+                                # escape(): ansible output is not Rich markup; a
+                                # streamed [/...] would otherwise crash the run.
                                 progress.update(
                                     task_id,
-                                    description=f"[cyan]{test.display_name}[/cyan] {stripped[:80]}",
+                                    description=f"[cyan]{escape(test.display_name)}[/cyan] {escape(stripped[:80])}",
                                 )
                     return_code = process.wait()
                 except KeyboardInterrupt:
                     terminate_process_group(process)
                     raise
+                finally:
+                    if watchdog is not None:
+                        watchdog.cancel()
 
         finished_at = utc_timestamp()
         status, status_reason = derive_status(
@@ -612,6 +690,9 @@ class CertificationRunner:
             unsupported_reason=unsupported_reason,
             recap=ansible_recap,
         )
+        if timed_out.is_set():
+            status = "failed"
+            status_reason = f"step timed out after {self.options.step_timeout:.0f}s and was terminated"
         return StepResult(
             step=step,
             pass_index=pass_index,
@@ -633,7 +714,7 @@ class CertificationRunner:
         if not results:
             return
         recap = summarize_results(results)
-        styles = {"passed": "green", "failed": "red", "unsupported": "yellow", "skipped": "dim"}
+        styles = {"passed": "green", "failed": "red", "unsupported": "yellow", "skipped": "dim", "not_run": "dim"}
         table = Table(title="Run recap")
         table.add_column("#", justify="right")
         table.add_column("Test")
@@ -659,8 +740,10 @@ class CertificationRunner:
         totals = (
             f"[bold]{counts['passed']} passed[/bold], {counts['failed']} failed, "
             f"{counts['unsupported']} unsupported, {counts['skipped']} skipped"
-            f" — total {recap.total_seconds:.1f}s"
         )
+        if counts.get("not_run"):
+            totals += f", {counts['not_run']} not run"
+        totals += f" — total {recap.total_seconds:.1f}s"
         if recap.slowest is not None:
             totals += f", slowest {recap.slowest.display_name} {recap.slowest.duration_seconds:.1f}s"
         self.console.print(totals)
@@ -686,7 +769,8 @@ class CertificationRunner:
             overall_exit = 130
             self.console.print("\n[yellow]Interrupted — writing partial report.[/yellow]")
         finally:
-            self.write_summary(results, started_at, utc_timestamp())
+            results.extend(self.unexecuted_steps(tests, results, interrupted))
+            self.write_summary(results, started_at, utc_timestamp(), interrupted=interrupted)
 
         self.render_recap(results)
         self.console.print(
@@ -697,6 +781,47 @@ class CertificationRunner:
             )
         )
         return overall_exit
+
+    def unexecuted_steps(
+        self,
+        tests: list[TestSpec],
+        results: list[StepResult],
+        interrupted: bool,
+    ) -> list[StepResult]:
+        """Record planned steps that never ran so reports cannot read as complete."""
+        planned = [
+            (pass_index, test)
+            for pass_index in range(1, self.options.repeat + 1)
+            for test in tests
+        ]
+        if self.options.dry_run or len(results) >= len(planned):
+            return []
+        if interrupted:
+            reason = "not executed: run interrupted"
+        elif self.options.stop_on_failure:
+            reason = "not executed: stopped after earlier failure (--stop-on-failure)"
+        else:
+            reason = "not executed"
+        timestamp = utc_timestamp()
+        return [
+            StepResult(
+                step=step,
+                pass_index=pass_index,
+                pass_count=self.options.repeat,
+                test_id=test.test_id,
+                display_name=test.display_name,
+                status="not_run",
+                status_reason=reason,
+                return_code=None,
+                started_at=timestamp,
+                finished_at=timestamp,
+                duration_seconds=0.0,
+                command=[],
+                artifacts=[],
+                ansible_recap={},
+            )
+            for step, (pass_index, test) in enumerate(planned[len(results):], start=len(results) + 1)
+        ]
 
     def _execute_plan(self, tests: list[TestSpec], results: list[StepResult]) -> int:
         overall_exit = 0
