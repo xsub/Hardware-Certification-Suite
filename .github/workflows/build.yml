@@ -61,14 +61,20 @@ jobs:
       - name: Install runner dependencies
         run: python3 -m pip install -r requirements-runner.txt
 
-      - name: Check profile passes end to end
+      - name: Check profile runs end to end (hw_detection is unsupported in containers)
         run: |
           python3 -m hcs run --profile check --inventory 127.0.0.1, -c local --sandbox-dir "$PWD/ci-check"
           python3 - <<'PY'
           import json
           summary = json.load(open("ci-check/runner/run.summary.json"))
-          assert summary["status"] == "passed", summary["status"]
-          print("check status:", summary["status"])
+          # CI runs in a container, which has no SMBIOS/DMI tables: hw_detection
+          # must report unsupported (not a hollow pass), so the run completes as
+          # passed_with_warnings. Real VMs/bare metal still assert hard evidence.
+          assert summary["status"] == "passed_with_warnings", summary["status"]
+          hw = next(r for r in summary["results"] if r["test_id"] == "hw_detection")
+          assert hw["status"] == "unsupported", hw
+          assert "container" in hw["status_reason"], hw["status_reason"]
+          print("check status:", summary["status"], "-", hw["status_reason"])
           PY
 
       - name: Network degrades to unsupported on a single host
