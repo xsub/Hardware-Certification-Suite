@@ -224,6 +224,20 @@ Manual certification checks tracked outside the automated runner:
   pxe        Interactive boot/network validation through interactive.yml.
 ```
 
+Run preflight before a long run:
+
+```bash
+python -m hcs preflight --preset certification --host <SUT IP> \
+  --lts-ip <LTS IP> --sut-ip <SUT IP>
+```
+
+Preflight checks the Python runtime, `ansible-playbook`, the playbook path,
+sandbox writability, free space, local privileges for `hw_detection`, network
+endpoint readiness, and any existing run artifacts in the target sandbox.
+Errors return a non-zero exit code. Warnings do not block the command, but they
+call out things an operator should resolve before treating the run as public
+submission evidence.
+
 Run one automated test locally through the runner:
 
 ```bash

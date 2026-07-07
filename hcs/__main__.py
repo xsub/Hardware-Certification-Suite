@@ -11,6 +11,7 @@ import sys
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm, IntPrompt, Prompt
+from rich.table import Table
 import yaml
 
 from .config import DEFAULT_CONFIG_PATH, build_sandbox_paths, config_extra_vars, config_str, load_config
@@ -35,6 +36,7 @@ from .presets import (
 )
 from . import __version__
 from .privacy import audit_artifacts
+from .preflight import PreflightReport, run_preflight
 from .profiles import PROFILES, TESTS
 from .runner import (
     CertificationRunner,
@@ -79,6 +81,32 @@ def build_parser() -> argparse.ArgumentParser:
     configure = subparsers.add_parser("configure", help="Build a named runner preset with prompts")
     configure.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     configure.add_argument("--preset", default=DEFAULT_PRESET_NAME)
+
+    preflight = subparsers.add_parser("preflight", help="Check runner readiness without executing tests")
+    preflight.add_argument("--config", type=Path, help="YAML runner config; defaults to hcs-runner.yml when present")
+    preflight.add_argument("--preset", help="Named preset from runner config; defaults to run.default_preset when set")
+    preflight.add_argument("--profile", choices=sorted(PROFILES))
+    preflight.add_argument("--inventory", help="Ansible inventory; defaults to 127.0.0.1, (local)")
+    preflight.add_argument("--host", help="Shorthand for --inventory HOST, (a single remote SUT)")
+    preflight.add_argument("--lts-ip", help="Explicit LTS/controller IP used by the network test")
+    preflight.add_argument("--sut-ip", help="Explicit SUT IP used by the network test")
+    preflight.add_argument(
+        "-c",
+        "--connection",
+        help="Ansible connection; inferred from the inventory when omitted "
+        "(local for loopback, SSH for a remote host)",
+    )
+    preflight.add_argument("--playbook", type=Path, default=Path("automated.yml"))
+    preflight.add_argument("--base-dir", type=Path, help="Base directory for generated HCS sandboxes")
+    preflight.add_argument("--sandbox-dir", type=Path, help="Explicit sandbox root for this HCS run")
+    preflight.add_argument("--run-id", help="Stable ID embedded in the sandbox name and reports")
+    preflight.add_argument("--extra-var", action="append", default=[], metavar="KEY=VALUE")
+    preflight.add_argument("--test", action="append", choices=sorted(TESTS), help="Check only this test id; repeatable")
+    preflight.add_argument("--repeat", type=positive_int, help="Repeat the selected test plan N times")
+    preflight.add_argument(
+        "--step-timeout",
+        help="Per-step wall-clock limit (e.g. 7200, 90m, 4h); checked against config parsing.",
+    )
 
     run = subparsers.add_parser("run", help="Run certification steps with Rich progress reporting")
     run.add_argument("--config", type=Path, help="YAML runner config; defaults to hcs-runner.yml when present")
@@ -163,6 +191,25 @@ def network_endpoints_from_args(args: argparse.Namespace, config: dict[str, obje
     if not lts_ip or not sut_ip:
         return {}
     return {"lts_ip": lts_ip, "sut_ip": sut_ip}
+
+
+def render_preflight_report(console: Console, report: PreflightReport) -> None:
+    table = Table(title="Preflight checks")
+    table.add_column("Status")
+    table.add_column("Check")
+    table.add_column("Message")
+    styles = {"ok": "green", "warning": "yellow", "error": "red"}
+    for item in report.checks:
+        style = styles.get(item.status, "")
+        table.add_row(item.status.upper(), item.name, escape(item.message), style=style)
+    console.print(table)
+    if report.ok:
+        if report.warnings:
+            console.print(f"[yellow]Preflight passed with {len(report.warnings)} warning(s).[/yellow]")
+        else:
+            console.print("[green]Preflight passed.[/green]")
+    else:
+        console.print(f"[red]Preflight failed with {len(report.errors)} error(s).[/red]")
 
 
 def configure_preset(args: argparse.Namespace, console: Console) -> int:
@@ -319,7 +366,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.command == "configure":
         return configure_preset(args, console)
-    if args.command == "run":
+    if args.command in {"run", "preflight"}:
         if args.host and args.inventory:
             parser.error("--host and --inventory are mutually exclusive")
         try:
@@ -353,7 +400,11 @@ def main(argv: list[str] | None = None) -> int:
                 if parsed_timeout is None or parsed_timeout < 1:
                     raise ValueError(f"invalid step timeout: {step_timeout_raw}")
                 step_timeout = float(parsed_timeout)
-            sandbox_dir = args.sandbox_dir or args.legacy_work_dir or args.legacy_run_dir
+            sandbox_dir = (
+                args.sandbox_dir
+                or getattr(args, "legacy_work_dir", None)
+                or getattr(args, "legacy_run_dir", None)
+            )
             paths = build_sandbox_paths(
                 config=config,
                 profile=profile,
@@ -377,13 +428,17 @@ def main(argv: list[str] | None = None) -> int:
             test_extra_vars=test_extra_vars,
             test_scopes=test_scopes,
             repeat=repeat,
-            dry_run=args.dry_run,
-            stop_on_failure=args.stop_on_failure,
+            dry_run=getattr(args, "dry_run", False),
+            stop_on_failure=getattr(args, "stop_on_failure", False),
             cli_extra_vars=cli_vars,
             step_timeout=step_timeout,
             manual_tests=manual_tests,
             network_endpoints=network_endpoints,
         )
+        if args.command == "preflight":
+            report = run_preflight(options)
+            render_preflight_report(console, report)
+            return 0 if report.ok else 1
         return CertificationRunner(options, console=console).run()
 
     parser.error(f"unknown command: {args.command}")
