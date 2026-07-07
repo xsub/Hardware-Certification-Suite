@@ -41,6 +41,14 @@
     },
     "test_scopes": { "type": "object", "additionalProperties": { "type": "string" } },
     "manual_tests": { "type": "object" },
+    "network_endpoints": {
+      "type": "object",
+      "properties": {
+        "lts_ip": { "type": "string" },
+        "sut_ip": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "tests": { "type": "array", "items": { "type": "string" } },
     "repeat": { "type": "integer", "minimum": 1 },
     "controller_system": { "type": "object" }

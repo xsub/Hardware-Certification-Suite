@@ -138,6 +138,8 @@ def write_pdf_report(
     manual_tests: Sequence[tuple[str, str, str]] = (),
     inventory: str | None = None,
     required_unexercised: Sequence[tuple[str, str]] = (),
+    sut_title: str | None = None,
+    sut_facts: Sequence[tuple[str, str]] = (),
 ) -> bool:
     """Write the optional PDF evidence report. Returns False if reportlab is unavailable."""
     if not REPORTLAB_AVAILABLE:
@@ -145,6 +147,7 @@ def write_pdf_report(
 
     fonts = _register_fonts()
     facts = {label: value for label, value in system_facts}
+    sut_facts_dict = {label: value for label, value in sut_facts}
 
     def on_cover(c, doc) -> None:
         width, height = doc.pagesize
@@ -199,6 +202,8 @@ def write_pdf_report(
         # Meta block. The facts describe the controller (runner host), which is
         # the SUT only for local runs — label them truthfully for SIG review.
         meta = [
+            ("System under test", sut_title or "SUT identity not collected"),
+            ("SUT source", sut_facts_dict.get("Source", "—")),
             ("Controller system", system_title),
             ("Controller OS", facts.get("OS", "—")),
             ("Inventory", inventory or "—"),
@@ -283,6 +288,30 @@ def write_pdf_report(
     from reportlab.platypus import PageBreak
 
     story.append(PageBreak())  # the cover is drawn on page 1; detail starts on page 2
+
+    story.append(Paragraph("System under test", styles["h2"]))
+    sut_rows = [[label, str(value)] for label, value in sut_facts]
+    if sut_rows:
+        sut_table = Table(sut_rows, colWidths=[42 * mm, 132 * mm], hAlign="LEFT")
+        sut_table.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (0, -1), fonts["semi"]),
+                    ("FONTNAME", (1, 0), (1, -1), fonts["body"]),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("TEXTCOLOR", (0, 0), (0, -1), HexColor(SCIENCE_BLUE_DARK)),
+                    ("TEXTCOLOR", (1, 0), (1, -1), HexColor(BLACK_PEARL)),
+                    ("ROWBACKGROUNDS", (0, 0), (-1, -1), [white, HexColor(SOFT_PEACH)]),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#E3E8EC")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ]
+            )
+        )
+        story.append(sut_table)
+    story.append(Spacer(1, 9 * mm))
 
     story.append(Paragraph("Controller system", styles["h2"]))
     id_rows = [[label, str(value)] for label, value in system_facts]

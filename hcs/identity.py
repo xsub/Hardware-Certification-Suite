@@ -8,6 +8,7 @@ import locale
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import socket
 import struct
@@ -71,6 +72,15 @@ class SystemFact:
 class SystemSummary:
     title: str
     facts: tuple[SystemFact, ...]
+
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+SUT_SYSTEM_FIELDS = {
+    "Manufacturer": "Manufacturer",
+    "Product Name": "Product",
+    "Version": "Version",
+    "Family": "Family",
+}
 
 
 def parse_os_release(content: str) -> dict[str, str]:
@@ -180,6 +190,65 @@ def read_text(path: Path) -> str | None:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_RE.sub("", text)
+
+
+def parse_hw_detection_sut_summary(content: str) -> SystemSummary | None:
+    """Extract non-secret SUT model identity from ``hw_detection.log``.
+
+    The raw hardware report can include serial numbers and UUIDs. The summary
+    intentionally keeps only vendor/model-style fields suitable for higher-level
+    reports; the raw log remains available for controlled review/redaction.
+    """
+    in_system_report = False
+    facts: list[SystemFact] = [SystemFact("Source", "logs/hw_detection.log")]
+    values: dict[str, str] = {}
+    for raw_line in strip_ansi(content).splitlines():
+        line = raw_line.strip()
+        if line == "System Report":
+            in_system_report = True
+            continue
+        if in_system_report and line.endswith("Report") and line != "System Report":
+            break
+        if not in_system_report or ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        key = key.strip()
+        value = raw_value.strip()
+        if not value or value.lower() in {"not specified", "none", "unknown"}:
+            continue
+        label = SUT_SYSTEM_FIELDS.get(key)
+        if label and label not in values:
+            values[label] = value
+
+    if not values:
+        return None
+    for label in ("Manufacturer", "Product", "Version", "Family"):
+        if label in values:
+            facts.append(SystemFact(label, values[label]))
+    title_parts = [values.get("Manufacturer"), values.get("Product"), values.get("Version")]
+    title = " ".join(part for part in title_parts if part) or "SUT hardware identity"
+    return SystemSummary(title=title, facts=tuple(facts))
+
+
+def sut_summary_from_hw_detection_log(path: Path) -> SystemSummary | None:
+    content = read_text(path)
+    if content is None:
+        return None
+    return parse_hw_detection_sut_summary(content)
+
+
+def unknown_sut_summary(reason: str) -> SystemSummary:
+    return SystemSummary(
+        title="SUT identity not collected",
+        facts=(
+            SystemFact("Source", "not collected"),
+            SystemFact("Status", reason),
+        ),
+    )
 
 
 def format_bytes(value: int) -> str:

@@ -7,7 +7,7 @@
 
 - name: Network - report missing endpoint addresses to runner
   ansible.builtin.debug:
-    msg: "HCS_RESULT: fail cannot determine LTS/SUT addresses (no SSH_CONNECTION in the Ansible session)"
+    msg: "HCS_RESULT: fail cannot determine LTS/SUT addresses (set --lts-ip/--sut-ip or run over SSH)"
   when: network_is_remote | bool and (lts_ip | length == 0 or sut_ip | length == 0)
 
 - name: Network - run against the SUT

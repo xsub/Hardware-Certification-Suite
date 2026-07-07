@@ -15,10 +15,10 @@ hcs_work_dir: "{{ work_dir|default(hcs_sandbox_dir) }}"
 hcs_scratch_dir: "{{ scratch_dir|default(hcs_work_dir + '/scratch') }}"
 hcs_cache_dir: "{{ cache_dir|default(hcs_work_dir + '/cache') }}"
 hcs_artifacts_dir: "{{ artifacts_dir|default(hcs_work_dir + '/artifacts') }}"
-lts_ip: "{{ _ssh_connection_fields[0] if _ssh_connection_fields | length >= 4 else '' }}"
+lts_ip: "{{ hcs_lts_ip | default(_ssh_connection_fields[0] if _ssh_connection_fields | length >= 4 else '') }}"
 lts_tests_dir: "./tests"
 lts_logs_dir: "{{ unique_logs_folder|default(logs_dir|default(hcs_work_dir + '/logs')) }}"
-sut_ip: "{{ _ssh_connection_fields[2] if _ssh_connection_fields | length >= 4 else '' }}"
+sut_ip: "{{ hcs_sut_ip | default(_ssh_connection_fields[2] if _ssh_connection_fields | length >= 4 else '') }}"
 sut_tests_dir: "{{ tests_dir|default(hcs_work_dir + '/sut-tests') }}"
 
 # CPU

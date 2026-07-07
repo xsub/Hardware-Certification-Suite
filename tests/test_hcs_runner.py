@@ -419,6 +419,17 @@ class BuildCommandTests(unittest.TestCase):
         self.assertEqual(extra["sandbox_dir"], str(runner.paths.sandbox_dir))
         self.assertEqual(extra["ltp_clone_path"], str(runner.paths.ltp_dir))
 
+    def test_injects_explicit_network_endpoints(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runner = build_command_runner(
+                tmp,
+                network_endpoints={"lts_ip": "10.0.0.1", "sut_ip": "10.0.0.2"},
+            )
+            extra = command_extra_vars(runner.build_command(TESTS["network"]))
+
+        self.assertEqual(extra["hcs_lts_ip"], "10.0.0.1")
+        self.assertEqual(extra["hcs_sut_ip"], "10.0.0.2")
+
     def test_extra_var_precedence_cli_over_test_over_step_over_profile(self) -> None:
         with TemporaryDirectory() as tmp:
             runner = build_command_runner(
@@ -603,6 +614,35 @@ class RequiredUnexercisedTests(unittest.TestCase):
             unexercised = runner.required_unexercised([self._result("hw_detection", "failed", "rc=2")])
 
         self.assertEqual(unexercised, [])
+
+
+class SutIdentityReportTests(unittest.TestCase):
+    def test_summary_and_text_report_separate_sut_from_controller(self) -> None:
+        with TemporaryDirectory() as tmp:
+            runner = make_runner(tmp, dry_run=False)
+            runner.prepare_run_dir()
+            (runner.paths.logs_dir / "hw_detection.log").write_text(
+                """
+                System Report
+                System Information
+                    Manufacturer: Supermicro
+                    Product Name: SYS-121H-TNR
+                    Serial Number: SECRET-SERIAL
+                Base Board Report
+                """,
+                encoding="utf-8",
+            )
+
+            runner.write_summary([step("passed")], "2026-06-01T00:00:00Z", "2026-06-01T00:00:01Z")
+
+            summary = json.loads((runner.run_dir / "run.summary.json").read_text(encoding="utf-8"))
+            text_report = (runner.run_dir / "run.report.txt").read_text(encoding="utf-8")
+
+        self.assertEqual(summary["sut_system"]["title"], "Supermicro SYS-121H-TNR")
+        self.assertEqual(summary["sut_system"]["facts"][0]["label"], "Source")
+        self.assertIn("System under test:", text_report)
+        self.assertIn("Controller system:", text_report)
+        self.assertNotIn("SECRET-SERIAL", json.dumps(summary["sut_system"]))
 
 
 class ParseExtraVarsTests(unittest.TestCase):

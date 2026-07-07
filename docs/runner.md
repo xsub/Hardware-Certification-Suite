@@ -617,6 +617,24 @@ the SSH connection because the inventory is not loopback. The draft
 `certification` preset works the same way: `python -m hcs run --preset
 certification --host <SUT IP>`.
 
+For network testing, prefer explicit endpoint addresses when the LTS and SUT
+paths are known:
+
+```bash
+python -m hcs run --preset certification --host <SUT IP> \
+  --lts-ip <LTS IP> --sut-ip <SUT IP>
+```
+
+The Ansible role can still infer endpoints from the remote SSH session, but
+`--lts-ip` and `--sut-ip` make the evidence and command line explicit. The
+runner records them in `config.requested.json` and `run.summary.json`.
+
+Reports separate `sut_system` from `controller_system`. `controller_system`
+describes the machine running the runner. `sut_system` is populated from
+`logs/hw_detection.log` when `hw_detection` runs and includes non-secret
+vendor/model fields; if no hardware detection log exists, the reports say that
+SUT identity was not collected.
+
 Full certification runs can take 2 to 5 days depending on the device resources.
 Use `tmux` or `screen` on the LTS so the session survives network
 interruptions.
@@ -693,6 +711,8 @@ direct playbook use and advanced tuning.
 | `test_network.duration` | Network test duration in seconds. |
 | `test_network.speed` | Target network test speed in Mbps. |
 | `test_network.device` | Optional network device selector. |
+| `hcs_lts_ip` | Explicit LTS/controller IP for the network test; runner sets this from `--lts-ip`. |
+| `hcs_sut_ip` | Explicit SUT IP for the network test; runner sets this from `--sut-ip`. |
 | `test_raid.duration` | RAID test duration in seconds. |
 | `test_raid.allow_data_loss` | Stress MD arrays even when they hold a filesystem/LVM/LUKS signature (`raid_allow_data_loss=true`). fio overwrites raw array data; default `false` stresses only unmounted, signature-free arrays. |
 | `ltp_version` | LTP git tag or branch to clone and build. Defaults to a recent stable LTP release. |

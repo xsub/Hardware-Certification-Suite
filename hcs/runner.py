@@ -28,7 +28,13 @@ from rich.text import Text
 
 from . import __version__
 from .config import SandboxPaths
-from .identity import SystemSummary, collect_system_summary, distro_logo
+from .identity import (
+    SystemSummary,
+    collect_system_summary,
+    distro_logo,
+    sut_summary_from_hw_detection_log,
+    unknown_sut_summary,
+)
 from .profiles import PROFILES, TESTS, TestSpec
 from .result_contract import ContractResult, build_result_contract
 from .submission import write_submission_manifest
@@ -144,6 +150,8 @@ class RunnerOptions:
     step_timeout: float | None = None
     # Manual (interactive) tests the preset declares; surfaced in reports.
     manual_tests: dict[str, dict[str, object]] = field(default_factory=dict)
+    # Explicit LTS/SUT endpoints for network tests; avoids SSH_CONNECTION-only inference.
+    network_endpoints: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -305,6 +313,11 @@ class CertificationRunner:
 
         self.render_identity_header()
         preset_line = f"[bold]Preset:[/bold] {self.options.preset_name}\n" if self.options.preset_name else ""
+        endpoint_lines = ""
+        if self.options.network_endpoints:
+            lts_ip = self.options.network_endpoints.get("lts_ip", "-")
+            sut_ip = self.options.network_endpoints.get("sut_ip", "-")
+            endpoint_lines = f"\n[bold]Network endpoints:[/bold] LTS {lts_ip} -> SUT {sut_ip}"
         self.console.print(
             Panel(
                 preset_line +
@@ -313,7 +326,8 @@ class CertificationRunner:
                 f"[bold]Run ID:[/bold] {self.paths.run_id}\n"
                 f"[bold]Sandbox:[/bold] {self.paths.sandbox_dir}\n"
                 f"[bold]Runner artifacts:[/bold] {self.run_dir}\n"
-                f"[bold]Inventory:[/bold] {self.options.inventory}",
+                f"[bold]Inventory:[/bold] {self.options.inventory}"
+                f"{endpoint_lines}",
                 title="AlmaLinux Hardware Certification Suite",
             )
         )
@@ -359,6 +373,10 @@ class CertificationRunner:
             # Anchor the tests tree to the playbook so runs work from any CWD.
             "lts_tests_dir": str(self.options.playbook.expanduser().resolve().parent / "tests"),
         }
+        if self.options.network_endpoints.get("lts_ip"):
+            sandbox_extra_vars["hcs_lts_ip"] = self.options.network_endpoints["lts_ip"]
+        if self.options.network_endpoints.get("sut_ip"):
+            sandbox_extra_vars["hcs_sut_ip"] = self.options.network_endpoints["sut_ip"]
         sandbox_extra_vars.update(extra_vars)
         command.extend(["--extra-vars", json.dumps(sandbox_extra_vars)])
         return command
@@ -400,6 +418,7 @@ class CertificationRunner:
             "test_extra_vars": self.options.test_extra_vars,
             "test_scopes": self.options.test_scopes,
             "manual_tests": self.options.manual_tests,
+            "network_endpoints": self.options.network_endpoints,
             "tests": [test.test_id for test in tests],
             "repeat": self.options.repeat,
             "controller_system": system_summary_payload(self.system_summary),
@@ -434,6 +453,12 @@ class CertificationRunner:
             "ansible_recap": result.ansible_recap,
         }
         result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    def sut_system_summary(self) -> SystemSummary:
+        summary = sut_summary_from_hw_detection_log(self.paths.logs_dir / "hw_detection.log")
+        if summary is not None:
+            return summary
+        return unknown_sut_summary("run hw_detection to collect SUT hardware identity")
 
     def run_outcome(self, results: list[StepResult], interrupted: bool) -> str:
         """Headline status; an incomplete or dry run must never read as passed."""
@@ -475,6 +500,7 @@ class CertificationRunner:
     ) -> None:
         status = self.run_outcome(results, interrupted)
         required_unexercised = self.required_unexercised(results)
+        sut_summary = self.sut_system_summary()
         result_contract = build_result_contract(
             status=status,
             results=[
@@ -508,7 +534,9 @@ class CertificationRunner:
             "finished_at": finished_at,
             "paths": self.paths.as_dict(),
             "manual_tests": self.options.manual_tests,
+            "network_endpoints": self.options.network_endpoints,
             "required_unexercised": required_unexercised,
+            "sut_system": system_summary_payload(sut_summary),
             "controller_system": system_summary_payload(self.system_summary),
             "results": [
                 {
@@ -530,8 +558,8 @@ class CertificationRunner:
             json.dumps(summary, indent=2) + "\n",
             encoding="utf-8",
         )
-        self.write_text_report(results, status, started_at, finished_at)
-        self.write_pdf_report(results, status, started_at, finished_at)
+        self.write_text_report(results, status, started_at, finished_at, sut_summary)
+        self.write_pdf_report(results, status, started_at, finished_at, sut_summary)
         self.write_submission_manifest()
 
     def write_submission_manifest(self) -> None:
@@ -547,6 +575,7 @@ class CertificationRunner:
         status: str,
         started_at: str,
         finished_at: str,
+        sut_summary: SystemSummary,
     ) -> None:
         """Write the optional PDF evidence report; never let it break a run."""
         try:
@@ -589,6 +618,8 @@ class CertificationRunner:
                 started_at=started_at,
                 finished_at=finished_at,
                 generated_at=utc_timestamp(),
+                sut_title=sut_summary.title,
+                sut_facts=[(fact.label, fact.value) for fact in sut_summary.facts],
                 system_title=self.system_summary.title,
                 system_facts=[(fact.label, fact.value) for fact in self.system_summary.facts],
                 results=result_dicts,
@@ -611,6 +642,7 @@ class CertificationRunner:
         status: str,
         started_at: str,
         finished_at: str,
+        sut_summary: SystemSummary,
     ) -> None:
         lines = [
             "AlmaLinux Hardware Certification Suite",
@@ -626,8 +658,16 @@ class CertificationRunner:
             f"Finished: {finished_at}",
             f"Runner version: {__version__}",
             "",
-            "Controller system:",
+            "System under test:",
         ]
+        for fact in sut_summary.facts:
+            lines.append(f"  {fact.label}: {fact.value}")
+        lines.extend(
+            [
+                "",
+                "Controller system:",
+            ]
+        )
         for fact in self.system_summary.facts:
             lines.append(f"  {fact.label}: {fact.value}")
         lines.extend(

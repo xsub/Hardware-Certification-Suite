@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -264,6 +264,33 @@ class ConnectionDefaultingTests(unittest.TestCase):
 
         self.assertEqual(config["inventory"], "sut.example,")
         self.assertIsNone(config["connection"])
+
+    def test_explicit_network_endpoints_are_recorded(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(
+                run_dry(
+                    "--profile",
+                    "check",
+                    "--lts-ip",
+                    "10.0.0.1",
+                    "--sut-ip",
+                    "10.0.0.2",
+                    "--sandbox-dir",
+                    str(sandbox),
+                ),
+                0,
+            )
+            config = requested_config(sandbox)
+
+        self.assertEqual(config["network_endpoints"], {"lts_ip": "10.0.0.1", "sut_ip": "10.0.0.2"})
+
+    def test_network_endpoints_must_be_a_pair(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            with redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    run_dry("--profile", "check", "--lts-ip", "10.0.0.1", "--sandbox-dir", str(sandbox))
 
 
 if __name__ == "__main__":

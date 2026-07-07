@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping
+import ipaddress
 from pathlib import Path
 import sys
 
@@ -85,6 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--profile", choices=sorted(PROFILES))
     run.add_argument("--inventory", help="Ansible inventory; defaults to 127.0.0.1, (local)")
     run.add_argument("--host", help="Shorthand for --inventory HOST, (a single remote SUT)")
+    run.add_argument("--lts-ip", help="Explicit LTS/controller IP used by the network test")
+    run.add_argument("--sut-ip", help="Explicit SUT IP used by the network test")
     run.add_argument(
         "-c",
         "--connection",
@@ -140,6 +143,26 @@ def existing_test_enabled(preset: Mapping[str, object] | None, test_id: str, def
     if isinstance(value, Mapping) and value.get("enabled") is False:
         return False
     return True
+
+
+def validated_ip_option(name: str, value: str | None) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        ipaddress.ip_address(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an IP address: {value}") from exc
+    return value
+
+
+def network_endpoints_from_args(args: argparse.Namespace, config: dict[str, object]) -> dict[str, str]:
+    lts_ip = validated_ip_option("--lts-ip", args.lts_ip or config_str(config, "network", "lts_ip"))
+    sut_ip = validated_ip_option("--sut-ip", args.sut_ip or config_str(config, "network", "sut_ip"))
+    if bool(lts_ip) != bool(sut_ip):
+        raise ValueError("--lts-ip and --sut-ip must be provided together")
+    if not lts_ip or not sut_ip:
+        return {}
+    return {"lts_ip": lts_ip, "sut_ip": sut_ip}
 
 
 def configure_preset(args: argparse.Namespace, console: Console) -> int:
@@ -320,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
             test_extra_vars = preset_test_extra_vars(preset)
             test_scopes = preset_test_scopes(preset)
             manual_tests = preset_manual_tests(preset)
+            network_endpoints = network_endpoints_from_args(args, config)
             for warning in (*config_warnings(config, preset), *preset_duration_warnings(preset)):
                 console.print(f"[yellow]config warning:[/yellow] {escape(warning)}")
             step_timeout_raw = args.step_timeout or config_str(config, "run", "step_timeout")
@@ -358,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
             cli_extra_vars=cli_vars,
             step_timeout=step_timeout,
             manual_tests=manual_tests,
+            network_endpoints=network_endpoints,
         )
         return CertificationRunner(options, console=console).run()
 

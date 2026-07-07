@@ -13,7 +13,9 @@ from hcs.identity import (
     format_uptime,
     memory_summary,
     parse_meminfo,
+    parse_hw_detection_sut_summary,
     parse_os_release,
+    sut_summary_from_hw_detection_log,
     swap_summary,
 )
 
@@ -99,6 +101,46 @@ class DistroIdentityTests(unittest.TestCase):
         self.assertTrue(summary.title)
         self.assertEqual(summary.facts[0].label, "OS")
         self.assertIn("AlmaLinux 10.0", summary.facts[0].value)
+
+    def test_parse_hw_detection_sut_summary_omits_secret_identifiers(self) -> None:
+        summary = parse_hw_detection_sut_summary(
+            """
+            \x1b[0;31mSystem Report\x1b[0m
+            System Information
+                Manufacturer: Supermicro
+                Product Name: SYS-121H-TNR
+                Version: 0123456789
+                Serial Number: SECRET-SERIAL
+                UUID: 11111111-2222-3333-4444-555555555555
+                Family: Rack Mount
+            Base Board Report
+            """
+        )
+
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary.title, "Supermicro SYS-121H-TNR 0123456789")
+        facts = {fact.label: fact.value for fact in summary.facts}
+        self.assertEqual(facts["Source"], "logs/hw_detection.log")
+        self.assertEqual(facts["Manufacturer"], "Supermicro")
+        self.assertEqual(facts["Product"], "SYS-121H-TNR")
+        joined = "\n".join(facts.values())
+        self.assertNotIn("SECRET-SERIAL", joined)
+        self.assertNotIn("11111111-2222-3333-4444-555555555555", joined)
+
+    def test_sut_summary_from_hw_detection_log(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hw_detection.log"
+            path.write_text(
+                "System Report\nSystem Information\n    Manufacturer: Alma\n    Product Name: LabBox\n",
+                encoding="utf-8",
+            )
+
+            summary = sut_summary_from_hw_detection_log(path)
+
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary.title, "Alma LabBox")
 
 
 if __name__ == "__main__":
