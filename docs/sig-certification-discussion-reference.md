@@ -10,8 +10,8 @@ if any, fit the upstream Hardware Certification Suite and certification process.
 - Official upstream repository: `AlmaLinux/Hardware-Certification-Suite`.
 - Official `main` was verified as identical to [`62d2882`](https://github.com/xsub/Hardware-Certification-Suite/commit/62d2882) (`basic CI workflow`)
   on 2026-06-23.
-- Fork range discussed here: [`62d2882`](https://github.com/xsub/Hardware-Certification-Suite/commit/62d2882)..[`b63c174`](https://github.com/xsub/Hardware-Certification-Suite/commit/b63c174).
-- Fork-authored commits in that range: 77.
+- Implementation range discussed here: [`62d2882`](https://github.com/xsub/Hardware-Certification-Suite/commit/62d2882)..[`dc80d4c`](https://github.com/xsub/Hardware-Certification-Suite/commit/dc80d4c).
+- Fork-authored implementation commits in that range: 86.
 - Upstream context before the fork-authored range:
   - [`2b8bbf1`](https://github.com/xsub/Hardware-Certification-Suite/commit/2b8bbf1) install phoronix-test-suite from epel
   - [`0fc1c73`](https://github.com/xsub/Hardware-Certification-Suite/commit/0fc1c73) add support for almalinux 10
@@ -392,6 +392,50 @@ Commits:
 - [`743a201`](https://github.com/xsub/Hardware-Certification-Suite/commit/743a201) Release 0.2.0: cover packaging and Python 3.9/3.10 in CI, refresh README
 - [`b63c174`](https://github.com/xsub/Hardware-Certification-Suite/commit/b63c174) CI: assert the container outcome hw_detection now actually produces
 
+### 7. Reference, Roadmap, And Submission-Readiness Hardening
+
+Area: pre-PR discussion support and result/submission guardrails.
+
+Description:
+
+This group was added after the initial reference split. It does not change the
+basic discussion areas above; it makes the proposal easier to evaluate by
+clarifying roadmap status, formalizing result/submission contracts, adding
+privacy/preflight checks, and tightening optional accelerator evidence
+guardrails.
+
+Short changelog:
+
+- Add the SIG discussion reference and conservative roadmap framing.
+- Add result-contract fields, packaged JSON schemas, and submission manifest
+  validation.
+- Add artifact privacy audit, SUT/controller identity separation, explicit
+  network endpoints, and `hcs preflight`.
+- Keep GPU/AI evidence optional and add stricter submit-worthy AI provenance
+  checks.
+- Add unit and CI coverage for the new contract/manifest paths.
+
+Suggested squash before PR:
+
+- Keep the discussion reference and roadmap as SIG issue/discussion material.
+- If the result/submission contract direction is accepted, squash the contract,
+  manifest, privacy, SUT identity, preflight, and CI coverage into one or two
+  reviewable implementation PRs.
+- Keep accelerator/AI guardrails attached to the optional GPU/AI proposal, not
+  to core certification fixes.
+
+Commits:
+
+- [`4e93d3c`](https://github.com/xsub/Hardware-Certification-Suite/commit/4e93d3c) Add SIG certification discussion reference
+- [`e21ab17`](https://github.com/xsub/Hardware-Certification-Suite/commit/e21ab17) Clarify certification roadmap framing
+- [`63be978`](https://github.com/xsub/Hardware-Certification-Suite/commit/63be978) Add run result contract schemas
+- [`7805ccc`](https://github.com/xsub/Hardware-Certification-Suite/commit/7805ccc) Add submission manifest validation
+- [`6bec9e6`](https://github.com/xsub/Hardware-Certification-Suite/commit/6bec9e6) Add artifact privacy audit
+- [`3944ebc`](https://github.com/xsub/Hardware-Certification-Suite/commit/3944ebc) Separate SUT identity and network endpoints
+- [`2c8caf6`](https://github.com/xsub/Hardware-Certification-Suite/commit/2c8caf6) Add runner preflight checks
+- [`dde867c`](https://github.com/xsub/Hardware-Certification-Suite/commit/dde867c) Add accelerator evidence guardrails
+- [`dc80d4c`](https://github.com/xsub/Hardware-Certification-Suite/commit/dc80d4c) Add CI contract validation coverage
+
 ## Suggested Squash / PR Shape
 
 To keep review manageable, the history should be rewritten into fewer topical
@@ -404,6 +448,7 @@ commits before any PRs are opened. A reasonable target shape:
    upstream suite. Split into runner core and preset/docs only if one PR is too
    large.
 4. Result contract and reporting artifacts.
-5. Optional GPU/AI test packs, probably as separate opt-in proposal PRs.
-6. CI/platform validation, either as its own PR or attached to the feature PRs
+5. Submission manifest, privacy audit, SUT identity, and preflight guardrails.
+6. Optional GPU/AI test packs, probably as separate opt-in proposal PRs.
+7. CI/platform validation, either as its own PR or attached to the feature PRs
    whose behavior it verifies.
