@@ -64,17 +64,18 @@ python -m hcs configure --preset default
 python -m hcs run --preset default
 ```
 
-Use the built-in certification policy preset:
+Preview the draft certification preset:
 
 ```bash
 python -m hcs run --preset certification
 python -m hcs run --preset certification --dry-run
 ```
 
-`certification` is the ALOSF / Certification SIG policy preset for ordinary
-automated hardware certification evidence. It runs the required automated
-checks by default and declares optional automated checks in the preset schema.
-Local `hcs-runner.yml` can override this preset when that policy changes.
+`certification` is a draft preset for ordinary automated hardware certification
+evidence. It models the current suite areas for SIG review, runs the proposed
+required automated checks by default, and declares optional automated checks in
+the preset schema. Local `hcs-runner.yml` can override this preset when the SIG
+or a lab wants to test a different policy.
 
 `hcs configure` stores the preset in `hcs-runner.yml`. It asks which tests to
 include, which profile each selected test should use, optional duration caps,
@@ -185,7 +186,7 @@ run.report.txt
     004 pass=02/02 gpu_burn      optional  skipped  0.0s rc=None dry-run
 ```
 
-Built-in certification preset preview:
+Draft certification preset preview:
 
 ```text
 $ python -m hcs run --preset certification --dry-run
@@ -524,7 +525,7 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` | Structured result for one step. |
 | `run.summary.json` | Machine-readable summary for the run. |
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
-| `run.report.pdf` | Branded PDF report (official AlmaLinux styling) for review and submission. Skipped only if `reportlab` is unavailable. |
+| `run.report.pdf` | Optional AlmaLinux-styled PDF rendering for review. Skipped if `reportlab` is unavailable. |
 
 Run statuses are truthful by construction: a completed run is `passed`,
 `passed_with_warnings` (some steps `unsupported`), or `failed`; an interrupted
@@ -563,9 +564,9 @@ python -m hcs run --profile check --host <SUT IP>
 ```
 
 `--host <SUT IP>` is shorthand for `--inventory <SUT IP>,`; the runner infers
-the SSH connection because the inventory is not loopback. The `certification`
-preset works the same way: `python -m hcs run --preset certification --host
-<SUT IP>`.
+the SSH connection because the inventory is not loopback. The draft
+`certification` preset works the same way: `python -m hcs run --preset
+certification --host <SUT IP>`.
 
 Full certification runs can take 2 to 5 days depending on the device resources.
 Use `tmux` or `screen` on the LTS so the session survives network

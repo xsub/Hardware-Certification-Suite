@@ -13,7 +13,7 @@ The AlmaLinux Hardware Certification Suite (HCS) is the open-source toolset
 behind the
 [AlmaLinux Hardware Certification Program](https://almalinux.org/certification/hardware-certification/).
 It exercises a system's hardware on AlmaLinux and produces repeatable evidence
-that the AlmaLinux Certification SIG reviews to grant official certification.
+for AlmaLinux Certification SIG review.
 
 ## AlmaLinux Hardware Certification
 
@@ -36,7 +36,9 @@ A passing local run is **evidence for SIG review, not a self-issued
 certification**. The program is managed by the
 [AlmaLinux Certification SIG](https://wiki.almalinux.org/sigs/Certification).
 
-**Sample report** — the runner produces a branded `run.report.pdf`; preview below (cover + results), or [download the full PDF](https://github.com/xsub/Hardware-Certification-Suite/raw/main/docs/sample-report.pdf):
+**Sample report** — this fork's runner can produce an AlmaLinux-styled
+`run.report.pdf`; preview below (cover + results), or
+[download the full PDF](https://github.com/xsub/Hardware-Certification-Suite/raw/main/docs/sample-report.pdf):
 
 ![Sample AlmaLinux Hardware Certification report — cover and results page](docs/sample-report.png)
 
@@ -78,9 +80,9 @@ pip install -e .
 cp hcs-runner.example.yml hcs-runner.yml
 ```
 
-The suite ships a Python/Rich runner (`hcs`) — the recommended way to produce
-certification evidence. It plans the work, streams progress, keeps every
-artifact in one per-run sandbox, and writes a branded PDF plus plain-text and
+This fork includes a Python/Rich runner (`hcs`) as a proposed guided way to
+produce review evidence. It plans the work, streams progress, keeps every
+artifact in one per-run sandbox, and writes an optional PDF plus plain-text and
 JSON reports for SIG review. `pip install -e .` adds the `hcs` command;
 `python -m hcs` works without installing.
 
@@ -88,7 +90,7 @@ JSON reports for SIG review. `pip install -e .` adds the `hcs` command;
 # fast smoke test (the local host is the default target)
 python -m hcs run --profile check
 
-# the certification policy preset (required automated checks)
+# proposed certification preset (required automated checks)
 python -m hcs run --preset certification
 
 # certify a separate machine over SSH
@@ -105,10 +107,10 @@ hardware report).
 | Runner feature | Provides / Value |
 | --- | --- |
 | Guided Rich console runner | Operators see the plan, current step, pass counters, and final result without reading raw Ansible output first. |
-| Certification preset | The built-in `certification` preset separates required automated checks, optional hardware-dependent checks, and manual checks. |
+| Certification preset | The draft `certification` preset separates required automated checks, optional hardware-dependent checks, and manual checks for SIG review. |
 | Sandboxed evidence | Each run gets one `AlmaLinux-HCS-<timestamp>-RunID-<id>` directory with consistent report, log, and artifact names. |
 | Repeatable burn-in | Profiles from `check` through `extreme`, repeated passes, named presets, and per-test duration/profile controls. |
-| Reports for review | A branded `run.report.pdf` in official AlmaLinux styling, plus `run.report.txt` for engineers and `run.summary.json` for automation. |
+| Reports for review | An optional AlmaLinux-styled `run.report.pdf`, plus `run.report.txt` for engineers and `run.summary.json` for automation. |
 
 ### Console Preview
 

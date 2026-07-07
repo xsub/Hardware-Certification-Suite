@@ -25,7 +25,7 @@ GPU_BURN_SNAP_VARS = {
 }
 BUILTIN_PRESETS: dict[str, dict[str, object]] = {
     CERTIFICATION_PRESET_NAME: {
-        "description": "ALOSF certification policy preset for ordinary automated hardware certification evidence.",
+        "description": "Draft certification preset for ordinary automated hardware certification evidence.",
         "profile": "long",
         "inventory": "127.0.0.1,",
         "repeat": 1,

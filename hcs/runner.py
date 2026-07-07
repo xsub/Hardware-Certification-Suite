@@ -518,7 +518,7 @@ class CertificationRunner:
         started_at: str,
         finished_at: str,
     ) -> None:
-        """Write the branded PDF report; never let it break a run."""
+        """Write the optional PDF evidence report; never let it break a run."""
         try:
             from .report_pdf import write_pdf_report as render_pdf
         except Exception:

@@ -2,8 +2,8 @@
 
 This is a pre-PR discussion reference for the AlmaLinux Certification SIG. It is
 intended to separate small compatibility/correctness fixes from broader runner,
-reporting, and optional benchmark proposals so the SIG can decide what belongs
-in the official Hardware Certification Suite.
+reporting, and optional benchmark proposals so the SIG can decide which pieces,
+if any, fit the upstream Hardware Certification Suite and certification process.
 
 ## Baseline And Range
 
@@ -20,6 +20,10 @@ in the official Hardware Certification Suite.
 The practical suggestion is not to open one large pull request. The small fixes
 can be reviewed as candidate patches, while runner/reporting/benchmarking work
 should first be discussed as proposals.
+
+Commit subjects listed below are historical Git subjects from the fork. The
+area descriptions and suggested squash groups use the more conservative wording
+intended for SIG discussion.
 
 ## Discussion Areas
 
@@ -48,29 +52,29 @@ SIG questions:
 - Should containerized `hw_detection` be an explicit unsupported outcome rather
   than a failure?
 - Should Python 3.9 on AlmaLinux 9 be a supported runner floor, or should the
-  official path require newer Python from the operator?
+  documented bootstrap path require a newer Python from the operator?
 
 ### B. Runner / UX / Artifact Improvements
 
 Proposal:
 
-- Add a Python/Rich `hcs` runner as a supported control plane over the existing
-  Ansible tests.
-- Keep direct Ansible execution available for low-level debugging, but make the
-  runner the preferred way to produce review evidence.
+- Add a Python/Rich `hcs` runner as a proposed guided control layer over the
+  existing Ansible tests.
+- Keep direct Ansible execution available. The runner could become a guided
+  evidence-collection path if the SIG agrees that this improves the process.
 - Provide profiles, named presets, repeat passes, local defaults, `--host`,
   `--version`, live progress, graceful interruption, and step timeouts.
 - Store every run in one durable sandbox under `/var/tmp` with stable names for
   console logs, per-step result JSON, `run.summary.json`, `run.report.txt`, and
   optional `run.report.pdf`.
-- Add a built-in `certification` preset that distinguishes required automated
-  tests, optional automated tests, and manual USB/PXE checks.
+- Add a draft `certification` preset that distinguishes required automated
+  tests, optional automated tests, and manual USB/PXE checks for SIG review.
 - Record controller identity and inventory in the artifacts so a reviewer can
   see what was exercised and what merely orchestrated the run.
 
 SIG questions:
 
-- Should the official suite adopt the runner as the normal operator path?
+- Should the upstream suite adopt the runner as one guided operator path?
 - Should the built-in `certification` preset live in the suite, or should SIG
   policy remain external and configure the runner?
 - Which artifact names and directory layout should be considered stable?
@@ -88,16 +92,16 @@ Candidate fixes / proposal:
 - Warn when runner config contains unknown keys, when required tests are
   disabled, when durations are clamped by profile caps, or when reports may be
   overwritten.
-- Add a branded PDF report as review-friendly output, while keeping JSON and
-  text reports as the contract-friendly artifacts.
+- Add an optional AlmaLinux-styled PDF rendering as review-friendly output,
+  while keeping JSON and text reports as the contract-friendly artifacts.
 
 SIG questions:
 
-- Which status taxonomy should be official?
+- Which status taxonomy should be shared across reports and review tooling?
 - Should "required but unsupported" affect the overall certification verdict,
   or should it be review input only?
-- Should the PDF report be considered an official artifact, or a convenience
-  rendering of the JSON/text contract?
+- Should the PDF report be considered an accepted submission artifact, or only
+  a convenience rendering of the JSON/text contract?
 - Should JSON schemas be introduced before any result contract is accepted?
 
 ### D. Optional Extended Tests: GPU Burn And AI Inference
@@ -120,7 +124,7 @@ SIG questions:
 - Do GPU burn-in and AI inference benchmarks belong in certification scope, or
   should they be an extended readiness / benchmark pack?
 - If included, should they be opt-in, tied to a datacenter/accelerator profile,
-  or kept entirely outside the official certification preset?
+  or kept entirely outside any SIG-approved certification preset?
 - What model, dataset, source pin, checksum, and licensing requirements are
   acceptable for reviewable AI benchmark evidence?
 
@@ -239,7 +243,8 @@ Short changelog:
   durable `/var/tmp`.
 - Auto-load runner config and add named presets with per-test profile/duration
   controls.
-- Add a certification preset with required, optional, and manual test scope.
+- Add a draft certification preset with required, optional, and manual test
+  scope.
 - Add system identity output and runner UX throttling for verbose suites.
 - Add `--host`, `--version`, and connection inference for local versus remote
   SUT runs.
@@ -248,11 +253,11 @@ Short changelog:
 
 Suggested squash before PR:
 
-- If the SIG accepts the runner direction, squash this into one runner
-  enhancement PR: `Add hcs runner with sandboxed certification artifacts`.
+- If the SIG wants to evaluate the runner direction, squash this into one runner
+  proposal PR: `Add hcs runner with sandboxed certification artifacts`.
 - If one PR is still too large, split into two reviewable PRs:
   - runner core, sandbox, execution, status handling, and connection inference
-  - presets, certification policy UX, identity header, and operator docs
+  - draft preset UX, identity header, and operator docs
 - Keep this separate from stock-test fixes so the SIG can accept correctness
   fixes even if the runner proposal needs more discussion.
 
@@ -293,13 +298,14 @@ Area: reporting and result-contract improvements.
 
 Description:
 
-This group makes reports harder to misread. It adds a branded PDF rendering,
-keeps text and JSON outputs, and tightens runner status semantics so partial,
-unsupported, interrupted, or dry-run results do not look like full passes.
+This group makes reports harder to misread. It adds an AlmaLinux-styled PDF
+rendering, keeps text and JSON outputs, and tightens runner status semantics so
+partial, unsupported, interrupted, or dry-run results do not look like full
+passes.
 
 Short changelog:
 
-- Add branded `run.report.pdf` with AlmaLinux assets and sample preview.
+- Add optional `run.report.pdf` with AlmaLinux assets and sample preview.
 - Keep PDF generation best-effort so missing reportlab or report text issues do
   not hide the run result.
 - Make the runner record truthful statuses across console, text, JSON, and PDF.
@@ -395,7 +401,7 @@ commits before any PRs are opened. A reasonable target shape:
    issue/discussion instead of a PR.
 2. Existing-test correctness for stock AlmaLinux 9/10.
 3. `hcs` runner proposal, only after the SIG agrees the runner belongs in the
-   official suite. Split into runner core and preset/docs only if one PR is too
+   upstream suite. Split into runner core and preset/docs only if one PR is too
    large.
 4. Result contract and reporting artifacts.
 5. Optional GPU/AI test packs, probably as separate opt-in proposal PRs.

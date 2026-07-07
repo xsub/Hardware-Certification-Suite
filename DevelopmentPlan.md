@@ -156,7 +156,7 @@ The runner should clearly show:
 - warnings, outliers, and possible bottlenecks
 
 The operator should not need to understand internal Ansible tags to perform a
-normal certification run.
+guided evidence-collection run, if the runner path is accepted.
 
 Initial interactive runner behavior:
 
@@ -167,9 +167,8 @@ Initial interactive runner behavior:
 - let each enabled test choose its own profile from `check` through `extreme`
 - allow duration caps for tests that support time limits; when both a profile
   and a duration cap are present, use the more restrictive value
-- provide a built-in `certification` preset that encodes the current ALOSF /
-  Certification SIG policy for required automated tests, optional automated
-  tests, and manual checks
+- provide a draft `certification` preset that models required automated tests,
+  optional automated tests, and manual checks for SIG review
 - show required/optional scope in the runner plan and write it into report
   artifacts
 - store the default preset name under `run.default_preset`, so
@@ -1139,7 +1138,7 @@ treated as the base for follow-up PRs:
 - stable per-step console/result file names
 - plain-text `run.report.txt` and machine-readable `run.summary.json`
 - `python -m hcs configure` preset prompt UI
-- built-in `certification` policy preset
+- draft `certification` preset
 - per-test profile and duration override support
 - optional `gpu_burn` test with NVIDIA detection and snap workload support
 - AlmaLinux 10 Phoronix dependency compatibility patch

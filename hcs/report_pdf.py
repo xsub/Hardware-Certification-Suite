@@ -1,9 +1,10 @@
-"""Branded PDF certification report for the AlmaLinux Hardware Certification Suite.
+"""Optional PDF evidence report for the AlmaLinux Hardware Certification Suite.
 
-Colors, fonts, and logo usage follow the official AlmaLinux OS Brand Book
+Colors, fonts, and logo usage follow the AlmaLinux OS Brand Book palette
 (Science Blue #0069DA, Atlantis #86DA2F, Candlelight #FFCB12, Black Pearl
-#082336, Sunburnt Cyclops #FF4649; Montserrat). The report is best-effort: if
-reportlab is not installed the runner still writes the text and JSON reports.
+#082336, Sunburnt Cyclops #FF4649; Montserrat). The PDF is a best-effort
+rendering of the JSON/text evidence: if reportlab is not installed the runner
+still writes the text and JSON reports.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ ASSETS_DIR = Path(__file__).parent / "assets"
 FONTS_DIR = ASSETS_DIR / "fonts"
 BRANDING_DIR = ASSETS_DIR / "branding"
 
-# Official AlmaLinux OS Brand Book palette.
+# AlmaLinux OS Brand Book palette.
 SCIENCE_BLUE = "#0069DA"
 SCIENCE_BLUE_DARK = "#004BBC"
 ATLANTIS = "#86DA2F"
@@ -138,7 +139,7 @@ def write_pdf_report(
     inventory: str | None = None,
     required_unexercised: Sequence[tuple[str, str]] = (),
 ) -> bool:
-    """Write a branded PDF report. Returns False if reportlab is unavailable."""
+    """Write the optional PDF evidence report. Returns False if reportlab is unavailable."""
     if not REPORTLAB_AVAILABLE:
         return False
 
@@ -253,7 +254,7 @@ def write_pdf_report(
             text_x = 18 * mm
         c.setFillColor(HexColor(BLACK_PEARL))
         c.setFont(fonts["semi"], 9)
-        c.drawString(text_x, height - 13.5 * mm, "Hardware Certification Report")
+        c.drawString(text_x, height - 13.5 * mm, "Hardware Certification Evidence")
         c.setFillColor(HexColor(SLATE))
         c.setFont(fonts["light"], 8)
         c.drawRightString(width - 18 * mm, height - 13.5 * mm, run_id)
@@ -389,9 +390,9 @@ def write_pdf_report(
         story.append(Paragraph("Required tests not exercised in this run", styles["h2"]))
         story.append(
             Paragraph(
-                "The policy marks these tests required, but this run produced no "
-                "pass/fail verdict for them. This report alone is not complete "
-                "certification evidence.",
+                "The selected preset marks these tests required, but this run "
+                "produced no pass/fail verdict for them. This report alone is "
+                "not complete certification evidence.",
                 styles["reason"],
             )
         )
@@ -408,7 +409,7 @@ def write_pdf_report(
         story.append(Paragraph("Manual tests — not executed by the runner", styles["h2"]))
         story.append(
             Paragraph(
-                "The certification policy also requires the interactive tests below "
+                "The selected preset also lists the interactive tests below "
                 "(run via interactive.yml); this report does not cover them.",
                 styles["reason"],
             )
@@ -428,7 +429,7 @@ def write_pdf_report(
         rightMargin=18 * mm,
         topMargin=24 * mm,
         bottomMargin=22 * mm,
-        title=f"AlmaLinux Hardware Certification Report — {run_id}",
+        title=f"AlmaLinux Hardware Certification Evidence — {run_id}",
         author="AlmaLinux Hardware Certification Suite",
     )
     doc.build(story, onFirstPage=cover_page, onLaterPages=on_later)
