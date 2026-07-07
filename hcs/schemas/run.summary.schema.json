@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://almalinux.org/hcs/schemas/run.summary.schema.json",
+  "title": "HCS Run Summary",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "runner_version",
+    "profile",
+    "status",
+    "run_verdict",
+    "certification_ready",
+    "result_contract",
+    "interrupted",
+    "started_at",
+    "finished_at",
+    "paths",
+    "results"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "runner_version": { "type": "string" },
+    "preset": { "type": ["string", "null"] },
+    "profile": { "type": "string" },
+    "inventory": { "type": "string" },
+    "connection": { "type": ["string", "null"] },
+    "repeat": { "type": "integer", "minimum": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "passed_with_warnings", "failed", "dry_run", "interrupted"]
+    },
+    "run_verdict": {
+      "type": "string",
+      "enum": ["passed", "failed", "incomplete", "dry_run", "interrupted"]
+    },
+    "certification_ready": { "type": "boolean" },
+    "result_contract": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "verdict",
+        "certification_ready",
+        "review_required",
+        "blocking_reasons",
+        "review_notes"
+      ],
+      "properties": {
+        "schema_version": { "type": "integer", "const": 1 },
+        "verdict": {
+          "type": "string",
+          "enum": ["passed", "failed", "incomplete", "dry_run", "interrupted"]
+        },
+        "certification_ready": { "type": "boolean" },
+        "review_required": { "type": "boolean" },
+        "blocking_reasons": { "type": "array", "items": { "type": "string" } },
+        "review_notes": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "interrupted": { "type": "boolean" },
+    "started_at": { "type": "string" },
+    "finished_at": { "type": "string" },
+    "paths": {
+      "type": "object",
+      "required": ["run_id", "sandbox_dir", "runner_dir"],
+      "additionalProperties": { "type": "string" }
+    },
+    "manual_tests": { "type": "object" },
+    "required_unexercised": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["test_id", "reason"],
+        "properties": {
+          "test_id": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "controller_system": { "type": "object" },
+    "results": {
+      "type": "array",
+      "items": { "$ref": "step-result.schema.json" }
+    }
+  },
+  "additionalProperties": true
+}

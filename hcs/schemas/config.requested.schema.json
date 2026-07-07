@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://almalinux.org/hcs/schemas/config.requested.schema.json",
+  "title": "HCS Requested Run Configuration",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "runner_version",
+    "profile",
+    "inventory",
+    "paths",
+    "dry_run",
+    "tests",
+    "repeat"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "runner_version": { "type": "string" },
+    "preset": { "type": ["string", "null"] },
+    "profile": { "type": "string" },
+    "inventory": { "type": "string" },
+    "connection": { "type": ["string", "null"] },
+    "playbook": { "type": "string" },
+    "paths": {
+      "type": "object",
+      "required": ["run_id", "sandbox_dir", "runner_dir"],
+      "additionalProperties": { "type": "string" }
+    },
+    "dry_run": { "type": "boolean" },
+    "stop_on_failure": { "type": "boolean" },
+    "step_timeout_seconds": { "type": ["number", "null"] },
+    "extra_vars": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cli_extra_vars": { "type": "object", "additionalProperties": { "type": "string" } },
+    "test_profiles": { "type": "object", "additionalProperties": { "type": "string" } },
+    "test_extra_vars": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "test_scopes": { "type": "object", "additionalProperties": { "type": "string" } },
+    "manual_tests": { "type": "object" },
+    "tests": { "type": "array", "items": { "type": "string" } },
+    "repeat": { "type": "integer", "minimum": 1 },
+    "controller_system": { "type": "object" }
+  },
+  "additionalProperties": true
+}

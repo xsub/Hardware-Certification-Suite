@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://almalinux.org/hcs/schemas/step-result.schema.json",
+  "title": "HCS Step Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "runner_version",
+    "step",
+    "pass_index",
+    "pass_count",
+    "test_id",
+    "display_name",
+    "status",
+    "status_reason",
+    "started_at",
+    "finished_at",
+    "duration_seconds",
+    "artifacts",
+    "ansible_recap"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "runner_version": { "type": "string" },
+    "step": { "type": "integer", "minimum": 1 },
+    "pass_index": { "type": "integer", "minimum": 1 },
+    "pass_count": { "type": "integer", "minimum": 1 },
+    "test_id": { "type": "string" },
+    "display_name": { "type": "string" },
+    "preset": { "type": ["string", "null"] },
+    "profile": { "type": "string" },
+    "scope": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "unsupported", "skipped", "not_run"]
+    },
+    "status_reason": { "type": "string" },
+    "return_code": { "type": ["integer", "null"] },
+    "started_at": { "type": "string" },
+    "finished_at": { "type": "string" },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "command": { "type": "array", "items": { "type": "string" } },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "ansible_recap": { "type": "object" }
+  },
+  "additionalProperties": true
+}

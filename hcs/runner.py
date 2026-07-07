@@ -30,6 +30,7 @@ from . import __version__
 from .config import SandboxPaths
 from .identity import SystemSummary, collect_system_summary, distro_logo
 from .profiles import PROFILES, TESTS, TestSpec
+from .result_contract import ContractResult, build_result_contract
 
 
 RECAP_RE = re.compile(
@@ -472,6 +473,23 @@ class CertificationRunner:
         interrupted: bool = False,
     ) -> None:
         status = self.run_outcome(results, interrupted)
+        required_unexercised = self.required_unexercised(results)
+        result_contract = build_result_contract(
+            status=status,
+            results=[
+                ContractResult(
+                    test_id=result.test_id,
+                    status=result.status,
+                    status_reason=result.status_reason,
+                    scope=self.options.test_scopes.get(result.test_id, "profile"),
+                )
+                for result in results
+            ],
+            required_unexercised=required_unexercised,
+            manual_tests=self.options.manual_tests,
+            dry_run=self.options.dry_run,
+            interrupted=interrupted,
+        )
         summary = {
             "schema_version": 1,
             "runner_version": __version__,
@@ -481,12 +499,15 @@ class CertificationRunner:
             "connection": self.options.connection,
             "repeat": self.options.repeat,
             "status": status,
+            "run_verdict": result_contract["verdict"],
+            "certification_ready": result_contract["certification_ready"],
+            "result_contract": result_contract,
             "interrupted": interrupted,
             "started_at": started_at,
             "finished_at": finished_at,
             "paths": self.paths.as_dict(),
             "manual_tests": self.options.manual_tests,
-            "required_unexercised": self.required_unexercised(results),
+            "required_unexercised": required_unexercised,
             "controller_system": system_summary_payload(self.system_summary),
             "results": [
                 {

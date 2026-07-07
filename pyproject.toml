@@ -22,7 +22,7 @@ hcs = "hcs.__main__:main"
 packages = ["hcs"]
 
 [tool.setuptools.package-data]
-hcs = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/branding/*.png"]
+hcs = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/branding/*.png", "schemas/*.json"]
 
 [tool.setuptools.dynamic]
 version = { attr = "hcs.__version__" }

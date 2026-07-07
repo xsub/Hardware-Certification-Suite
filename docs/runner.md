@@ -527,14 +527,24 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 | `run.report.pdf` | Optional AlmaLinux-styled PDF rendering for review. Skipped if `reportlab` is unavailable. |
 
-Run statuses are truthful by construction: a completed run is `passed`,
-`passed_with_warnings` (some steps `unsupported`), or `failed`; an interrupted
-run is `interrupted` and a `--dry-run` is `dry_run` — neither ever reads as
-`passed`. Steps planned but never executed (Ctrl-C, `--stop-on-failure`)
-appear as `not_run` with the reason. When the preset declares manual tests
-(`usb`, `pxe` in `certification`), all three reports list them explicitly as
-not executed by the runner, so automated-only evidence states what it does not
-cover.
+Run statuses are truthful by construction: a completed run keeps the
+backward-compatible headline `status` of `passed`, `passed_with_warnings`
+(some steps `unsupported`), or `failed`; an interrupted run is `interrupted`
+and a `--dry-run` is `dry_run` — neither ever reads as `passed`. New tooling
+should read the explicit result contract in `run.summary.json`:
+
+- `run_verdict`: `passed`, `failed`, `incomplete`, `dry_run`, or `interrupted`.
+- `certification_ready`: `true` only when the selected required evidence has
+  pass/fail coverage and no blocking failures.
+- `result_contract.blocking_reasons`: machine-readable reasons that prevent
+  certification-ready evidence.
+- `result_contract.review_notes`: non-blocking issues a reviewer may still
+  want to inspect.
+
+Steps planned but never executed (Ctrl-C, `--stop-on-failure`) appear as
+`not_run` with the reason. When the preset declares manual tests (`usb`, `pxe`
+in `certification`), all three reports list them explicitly as not executed by
+the runner, so automated-only evidence states what it does not cover.
 
 Reports also call out **required tests not exercised**: any required-scope
 test that produced no pass/fail verdict in the run — unsupported, skipped,
@@ -543,6 +553,11 @@ in `run.summary.json` (`required_unexercised`), the text report, the console
 recap, and the PDF. The runner additionally warns at startup about unknown
 `hcs-runner.yml` keys (typos would otherwise be ignored silently) and about
 preset durations above the profile cap.
+
+JSON schemas for `config.requested.json`, per-step result JSON, and
+`run.summary.json` are packaged under `hcs/schemas/`. They are intentionally
+the contract for automation; text and PDF reports are renderings of the same
+evidence.
 
 ## Remote LTS/SUT
 

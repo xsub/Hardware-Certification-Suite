@@ -253,6 +253,9 @@ class GracefulStopTests(unittest.TestCase):
             summary = json.loads((runner.run_dir / "run.summary.json").read_text(encoding="utf-8"))
             self.assertEqual(exit_code, 130)
             self.assertEqual(summary["status"], "interrupted")
+            self.assertEqual(summary["run_verdict"], "interrupted")
+            self.assertFalse(summary["certification_ready"])
+            self.assertEqual(summary["result_contract"]["verdict"], "interrupted")
             self.assertTrue(summary["interrupted"])
             statuses = [result["status"] for result in summary["results"]]
             self.assertEqual(statuses, ["passed", "not_run"])
@@ -266,6 +269,8 @@ class GracefulStopTests(unittest.TestCase):
             summary = json.loads((runner.run_dir / "run.summary.json").read_text(encoding="utf-8"))
             self.assertEqual(exit_code, 0)
             self.assertEqual(summary["status"], "dry_run")
+            self.assertEqual(summary["run_verdict"], "dry_run")
+            self.assertFalse(summary["certification_ready"])
             self.assertEqual(summary["results"][0]["status"], "skipped")
 
     def test_stop_on_failure_records_unexecuted_steps(self) -> None:
@@ -286,6 +291,8 @@ class GracefulStopTests(unittest.TestCase):
 
             summary = json.loads((runner.run_dir / "run.summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["status"], "failed")
+            self.assertEqual(summary["run_verdict"], "failed")
+            self.assertFalse(summary["certification_ready"])
             statuses = [result["status"] for result in summary["results"]]
             self.assertEqual(statuses, ["failed", "not_run"])
             self.assertIn("stop-on-failure", summary["results"][1]["status_reason"])
