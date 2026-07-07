@@ -42,6 +42,7 @@ from .runner import (
     render_profiles,
     render_tests,
 )
+from .submission import validate_submission
 
 
 def positive_int(raw: str) -> int:
@@ -58,6 +59,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("profiles", help="List built-in run profiles")
     subparsers.add_parser("tests", help="List known test steps")
+
+    validate_run = subparsers.add_parser("validate-run", help="Validate a completed HCS run directory")
+    validate_run.add_argument("path", type=Path, help="Sandbox directory or its runner/ directory")
+    validate_run.add_argument(
+        "--write-manifest",
+        action="store_true",
+        help="Create or refresh runner/submission.manifest.json before validating",
+    )
 
     configure = subparsers.add_parser("configure", help="Build a named runner preset with prompts")
     configure.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -254,6 +263,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "tests":
         render_tests(console)
         return 0
+    if args.command == "validate-run":
+        report = validate_submission(args.path, write_manifest=args.write_manifest)
+        if args.write_manifest:
+            console.print(f"[green]Wrote manifest:[/green] {report.manifest_path}")
+        for issue in report.issues:
+            color = "red" if issue.severity == "error" else "yellow"
+            console.print(f"[{color}]{issue.severity.upper()}:[/{color}] {escape(issue.message)}")
+        if report.ok:
+            console.print(f"[green]Run directory is structurally valid:[/green] {report.sandbox_dir}")
+            return 0
+        console.print(f"[red]Run directory has {len(report.errors)} validation error(s).[/red]")
+        return 1
     if args.command == "configure":
         return configure_preset(args, console)
     if args.command == "run":

@@ -524,6 +524,7 @@ Runner artifacts live under `<sandbox>/runner/`.
 | `tests/NNN-passNN-test_id/NNN-passNN-test_id.console.log` | Streamed command output for one step. |
 | `tests/NNN-passNN-test_id/NNN-passNN-test_id.result.json` | Structured result for one step. |
 | `run.summary.json` | Machine-readable summary for the run. |
+| `submission.manifest.json` | Proposed submission manifest mapping required and reviewer-convenience artifacts. |
 | `run.report.txt` | Plain-text engineering report with timestamps and runner version. |
 | `run.report.pdf` | Optional AlmaLinux-styled PDF rendering for review. Skipped if `reportlab` is unavailable. |
 
@@ -555,9 +556,25 @@ recap, and the PDF. The runner additionally warns at startup about unknown
 preset durations above the profile cap.
 
 JSON schemas for `config.requested.json`, per-step result JSON, and
-`run.summary.json` are packaged under `hcs/schemas/`. They are intentionally
-the contract for automation; text and PDF reports are renderings of the same
-evidence.
+`run.summary.json` are packaged under `hcs/schemas/`, along with the proposed
+`submission.manifest.json` schema. They are intentionally the contract for
+automation; text and PDF reports are renderings of the same evidence.
+
+Validate a completed sandbox before preparing a public submission:
+
+```bash
+python -m hcs validate-run /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5
+```
+
+Refresh the manifest and then validate it:
+
+```bash
+python -m hcs validate-run --write-manifest /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5
+```
+
+The manifest currently records a conservative target hint,
+`systems/<vendor>/<system-or-model>/<run-id>/`, for
+`AlmaLinux/certifications`; the final public layout remains a SIG decision.
 
 ## Remote LTS/SUT
 

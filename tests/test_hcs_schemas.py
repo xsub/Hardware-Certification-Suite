@@ -11,6 +11,7 @@ class SchemaArtifactTests(unittest.TestCase):
             "config.requested.schema.json",
             "run.summary.schema.json",
             "step-result.schema.json",
+            "submission.manifest.schema.json",
         }
 
         for schema_name in schema_names:

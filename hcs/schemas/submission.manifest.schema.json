@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://almalinux.org/hcs/schemas/submission.manifest.schema.json",
+  "title": "HCS Submission Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "runner_version",
+    "generated_at",
+    "target",
+    "run",
+    "roles",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "runner_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "target": {
+      "type": "object",
+      "required": ["repository", "path_hint"],
+      "properties": {
+        "repository": { "type": "string" },
+        "path_hint": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "run": {
+      "type": "object",
+      "required": ["run_id", "profile", "status", "run_verdict", "certification_ready"],
+      "properties": {
+        "run_id": { "type": ["string", "null"] },
+        "preset": { "type": ["string", "null"] },
+        "profile": { "type": ["string", "null"] },
+        "status": { "type": ["string", "null"] },
+        "run_verdict": { "type": ["string", "null"] },
+        "certification_ready": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "roles": {
+      "type": "object",
+      "required": ["required", "optional", "reviewer_convenience"],
+      "additionalProperties": { "type": "string" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "role", "description", "required", "exists"],
+        "properties": {
+          "path": { "type": "string" },
+          "role": { "type": "string", "enum": ["required", "optional", "reviewer_convenience"] },
+          "description": { "type": "string" },
+          "required": { "type": "boolean" },
+          "exists": { "type": "boolean" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

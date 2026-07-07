@@ -31,6 +31,7 @@ from .config import SandboxPaths
 from .identity import SystemSummary, collect_system_summary, distro_logo
 from .profiles import PROFILES, TESTS, TestSpec
 from .result_contract import ContractResult, build_result_contract
+from .submission import write_submission_manifest
 
 
 RECAP_RE = re.compile(
@@ -531,6 +532,14 @@ class CertificationRunner:
         )
         self.write_text_report(results, status, started_at, finished_at)
         self.write_pdf_report(results, status, started_at, finished_at)
+        self.write_submission_manifest()
+
+    def write_submission_manifest(self) -> None:
+        """Write the proposed submission manifest; never let it break a run."""
+        try:
+            write_submission_manifest(self.paths.sandbox_dir)
+        except Exception as exc:
+            self.console.print(f"[yellow]Submission manifest skipped:[/yellow] {exc}")
 
     def write_pdf_report(
         self,
