@@ -33,6 +33,7 @@ from .presets import (
     preset_test_scopes,
 )
 from . import __version__
+from .privacy import audit_artifacts
 from .profiles import PROFILES, TESTS
 from .runner import (
     CertificationRunner,
@@ -67,6 +68,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Create or refresh runner/submission.manifest.json before validating",
     )
+
+    audit_artifacts_parser = subparsers.add_parser(
+        "audit-artifacts",
+        help="Scan a completed run directory for likely sensitive public-submission identifiers",
+    )
+    audit_artifacts_parser.add_argument("path", type=Path, help="Sandbox directory or its runner/ directory")
 
     configure = subparsers.add_parser("configure", help="Build a named runner preset with prompts")
     configure.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -274,6 +281,18 @@ def main(argv: list[str] | None = None) -> int:
             console.print(f"[green]Run directory is structurally valid:[/green] {report.sandbox_dir}")
             return 0
         console.print(f"[red]Run directory has {len(report.errors)} validation error(s).[/red]")
+        return 1
+    if args.command == "audit-artifacts":
+        audit = audit_artifacts(args.path)
+        if audit.ok:
+            console.print(f"[green]No likely sensitive identifiers found:[/green] {audit.sandbox_dir}")
+            return 0
+        for finding in audit.findings:
+            console.print(
+                f"[yellow]{finding.category}[/yellow] "
+                f"{finding.path}:{finding.line} {escape(finding.sample)}"
+            )
+        console.print(f"[yellow]{len(audit.findings)} privacy finding(s); review before publishing.[/yellow]")
         return 1
     if args.command == "configure":
         return configure_preset(args, console)

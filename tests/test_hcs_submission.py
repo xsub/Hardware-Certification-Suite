@@ -35,6 +35,15 @@ class SubmissionManifestTests(unittest.TestCase):
         self.assertIn("runner/config.requested.json", required_paths)
         self.assertIn("runner/run.summary.json", required_paths)
         self.assertTrue(any(path.endswith(".result.json") for path in required_paths))
+        privacy = {artifact["path"]: artifact["privacy"] for artifact in manifest["artifacts"]}
+        self.assertEqual(privacy["runner/run.summary.json"], "review_before_publish")
+        self.assertTrue(
+            all(
+                value == "private_or_redacted"
+                for path, value in privacy.items()
+                if path.endswith(".console.log")
+            )
+        )
 
     def test_build_manifest_accepts_runner_directory(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -78,6 +87,20 @@ class SubmissionManifestTests(unittest.TestCase):
 
         self.assertTrue(report.ok)
         self.assertEqual(report.manifest_path.name, "submission.manifest.json")
+
+    def test_validate_submission_includes_privacy_warnings(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "run"
+            self.assertEqual(run_dry(sandbox), 0)
+            (sandbox / "runner" / "private-note.txt").write_text(
+                "Serial Number: ABC123\n",
+                encoding="utf-8",
+            )
+
+            report = validate_submission(sandbox)
+
+        self.assertTrue(report.ok)
+        self.assertTrue(any("possible serial" in issue.message for issue in report.warnings))
 
     def test_cli_validate_run(self) -> None:
         with TemporaryDirectory() as tmp:

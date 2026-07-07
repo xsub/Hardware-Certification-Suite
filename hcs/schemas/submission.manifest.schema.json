@@ -44,17 +44,26 @@
       "required": ["required", "optional", "reviewer_convenience"],
       "additionalProperties": { "type": "string" }
     },
+    "privacy": {
+      "type": "object",
+      "required": ["safe", "review_before_publish", "private_or_redacted"],
+      "additionalProperties": { "type": "string" }
+    },
     "artifacts": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["path", "role", "description", "required", "exists"],
+        "required": ["path", "role", "description", "required", "exists", "privacy"],
         "properties": {
           "path": { "type": "string" },
           "role": { "type": "string", "enum": ["required", "optional", "reviewer_convenience"] },
           "description": { "type": "string" },
           "required": { "type": "boolean" },
           "exists": { "type": "boolean" },
+          "privacy": {
+            "type": "string",
+            "enum": ["safe", "review_before_publish", "private_or_redacted"]
+          },
           "size_bytes": { "type": "integer", "minimum": 0 },
           "sha256": { "type": "string" }
         },

@@ -79,7 +79,14 @@ def relative_files(root: Path, patterns: Iterable[str]) -> list[Path]:
     return found
 
 
-def artifact_entry(sandbox_dir: Path, relative_path: Path, role: str, description: str) -> dict[str, object]:
+def artifact_entry(
+    sandbox_dir: Path,
+    relative_path: Path,
+    role: str,
+    description: str,
+    *,
+    privacy: str = "review_before_publish",
+) -> dict[str, object]:
     path = sandbox_dir / relative_path
     entry: dict[str, object] = {
         "path": relative_path.as_posix(),
@@ -87,6 +94,7 @@ def artifact_entry(sandbox_dir: Path, relative_path: Path, role: str, descriptio
         "description": description,
         "required": role == "required",
         "exists": path.exists(),
+        "privacy": privacy,
     }
     if path.exists() and path.is_file():
         entry["size_bytes"] = path.stat().st_size
@@ -126,12 +134,24 @@ def build_submission_manifest(sandbox_path: Path) -> dict[str, object]:
         for path in result_files
     )
     artifacts.extend(
-        artifact_entry(sandbox_dir, path, "reviewer_convenience", "Human-readable review artifact")
+        artifact_entry(
+            sandbox_dir,
+            path,
+            "reviewer_convenience",
+            "Human-readable review artifact",
+            privacy="review_before_publish",
+        )
         for path in REVIEWER_CONVENIENCE_FILES
         if (sandbox_dir / path).exists()
     )
     artifacts.extend(
-        artifact_entry(sandbox_dir, path, "reviewer_convenience", "Per-step console log")
+        artifact_entry(
+            sandbox_dir,
+            path,
+            "reviewer_convenience",
+            "Per-step console log",
+            privacy="private_or_redacted",
+        )
         for path in console_logs
     )
 
@@ -156,6 +176,11 @@ def build_submission_manifest(sandbox_path: Path) -> dict[str, object]:
             "required": "Must be present for automated validation.",
             "optional": "May be submitted when relevant and safe to publish.",
             "reviewer_convenience": "Useful for human review, not the primary machine contract.",
+        },
+        "privacy": {
+            "safe": "Expected to be safe for public submission.",
+            "review_before_publish": "Review for host-specific identifiers before publishing.",
+            "private_or_redacted": "Keep private unless the SIG asks for it, or publish only after redaction.",
         },
         "artifacts": artifacts,
     }
@@ -210,6 +235,28 @@ def validate_submission(sandbox_path: Path, *, write_manifest: bool = False) -> 
             issues.append(ValidationIssue("warning", f"certification readiness blocker: {reason}"))
     if summary.get("certification_ready") is False:
         issues.append(ValidationIssue("warning", "run.summary.json marks certification_ready=false"))
+
+    try:
+        from .privacy import audit_artifacts
+
+        privacy_audit = audit_artifacts(sandbox_dir)
+    except Exception as exc:
+        issues.append(ValidationIssue("warning", f"privacy audit could not run: {exc}"))
+    else:
+        for finding in privacy_audit.findings[:10]:
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    f"possible {finding.category} in {finding.path}:{finding.line}: {finding.sample}",
+                )
+            )
+        if len(privacy_audit.findings) > 10:
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    f"{len(privacy_audit.findings) - 10} additional privacy finding(s) suppressed",
+                )
+            )
 
     result_files = relative_files(sandbox_dir, ("runner/tests/*/*.result.json",))
     summary_results = summary.get("results", [])

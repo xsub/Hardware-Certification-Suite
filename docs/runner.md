@@ -576,6 +576,23 @@ The manifest currently records a conservative target hint,
 `systems/<vendor>/<system-or-model>/<run-id>/`, for
 `AlmaLinux/certifications`; the final public layout remains a SIG decision.
 
+Before publishing evidence, run the privacy audit:
+
+```bash
+python -m hcs audit-artifacts /var/tmp/AlmaLinux-HCS-20260601T115819Z-RunID-check-3248b3e5
+```
+
+The audit looks for likely host-specific identifiers such as serial numbers,
+MAC addresses, non-loopback IP addresses, DMI UUIDs, host fields, and storage
+device IDs. Findings are printed with redacted samples so the audit itself does
+not leak the value. Treat manifest privacy labels conservatively:
+
+| Privacy label | Meaning |
+| --- | --- |
+| `safe` | Expected to be safe for public submission. |
+| `review_before_publish` | Inspect for environment-specific identifiers before publishing. |
+| `private_or_redacted` | Keep private unless the SIG requests it, or publish only after redaction. |
+
 ## Remote LTS/SUT
 
 Use remote mode when the controller and SUT are different machines.
