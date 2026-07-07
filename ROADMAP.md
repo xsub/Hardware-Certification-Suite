@@ -5,6 +5,24 @@ proposed as stable upstream behavior. It is intentionally conservative: items
 below are meant to strengthen AlmaLinux certification evidence, reviewability,
 and operator safety rather than broaden the scope for its own sake.
 
+## Implementation Status
+
+The implementation now covers the roadmap as vertical slices in this fork:
+
+- Result-contract fields and packaged JSON schemas are present.
+- Submission manifest generation and `hcs validate-run` are present.
+- Privacy audit and manifest privacy labels are present.
+- SUT identity is separated from controller identity, with explicit network
+  endpoint support for remote runs.
+- `hcs preflight` checks runner readiness before long runs.
+- GPU/AI workloads remain optional, with submit-worthy AI guardrails for pinned
+  and checksummed inputs.
+- Unit tests and AlmaLinux container smoke checks cover the contract paths.
+
+Remaining open points are SIG decisions: whether the runner belongs upstream,
+which preset/policy shape should be accepted, and whether optional
+accelerator/AI evidence belongs in any official certification profile.
+
 ## Near-Term: Certification Evidence Integrity
 
 - Define the top-level run verdict contract before treating `run.summary.json`
@@ -84,4 +102,3 @@ and operator safety rather than broaden the scope for its own sake.
   and remote SUT identity.
 - Add fixture-based validation for the public submission manifest once the
   manifest format exists.
-

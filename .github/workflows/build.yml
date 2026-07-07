@@ -61,29 +61,47 @@ jobs:
       - name: Install runner dependencies
         run: python3 -m pip install -r requirements-runner.txt
 
+      - name: Preflight check profile contract
+        run: |
+          python3 -m hcs preflight \
+            --profile check \
+            --inventory 127.0.0.1, \
+            -c local \
+            --sandbox-dir "$PWD/ci-check"
+
       - name: Check profile runs end to end (hw_detection is unsupported in containers)
         run: |
           python3 -m hcs run --profile check --inventory 127.0.0.1, -c local --sandbox-dir "$PWD/ci-check"
+          python3 -m hcs validate-run "$PWD/ci-check"
           python3 - <<'PY'
           import json
           summary = json.load(open("ci-check/runner/run.summary.json"))
+          manifest = json.load(open("ci-check/runner/submission.manifest.json"))
           # CI runs in a container, which has no SMBIOS/DMI tables: hw_detection
           # must report unsupported (not a hollow pass), so the run completes as
-          # passed_with_warnings. Real VMs/bare metal still assert hard evidence.
+          # passed_with_warnings. This remains smoke/contract coverage; real
+          # VMs/bare metal still assert hard hardware evidence.
           assert summary["status"] == "passed_with_warnings", summary["status"]
+          assert summary["run_verdict"] == "passed", summary["run_verdict"]
+          assert summary["result_contract"]["review_required"] is True, summary["result_contract"]
           hw = next(r for r in summary["results"] if r["test_id"] == "hw_detection")
           assert hw["status"] == "unsupported", hw
           assert "container" in hw["status_reason"], hw["status_reason"]
+          required = {a["path"] for a in manifest["artifacts"] if a["role"] == "required"}
+          assert "runner/config.requested.json" in required, required
+          assert "runner/run.summary.json" in required, required
           print("check status:", summary["status"], "-", hw["status_reason"])
           PY
 
       - name: Network degrades to unsupported on a single host
         run: |
           python3 -m hcs run --test network --inventory 127.0.0.1, -c local --sandbox-dir "$PWD/ci-net"
+          python3 -m hcs validate-run "$PWD/ci-net"
           python3 - <<'PY'
           import json
           summary = json.load(open("ci-net/runner/run.summary.json"))
           network = next(r for r in summary["results"] if r["test_id"] == "network")
           assert network["status"] == "unsupported", network
+          assert summary["result_contract"]["review_required"] is True, summary["result_contract"]
           print("network status:", network["status"], "-", network["status_reason"])
           PY

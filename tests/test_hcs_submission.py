@@ -16,6 +16,97 @@ def run_dry(sandbox: Path) -> int:
         return main(["run", "--profile", "check", "--sandbox-dir", str(sandbox), "--dry-run"])
 
 
+def write_public_submission_fixture(sandbox: Path) -> None:
+    runner = sandbox / "runner"
+    step_dir = runner / "tests" / "001-pass01-hw_detection"
+    step_dir.mkdir(parents=True)
+    (runner / "config.requested.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "runner_version": "test",
+                "profile": "check",
+                "inventory": "127.0.0.1,",
+                "paths": {"run_id": "fixture", "sandbox_dir": str(sandbox), "runner_dir": str(runner)},
+                "dry_run": False,
+                "stop_on_failure": False,
+                "tests": ["hw_detection"],
+                "repeat": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    step_payload = {
+        "schema_version": 1,
+        "runner_version": "test",
+        "step": 1,
+        "pass_index": 1,
+        "pass_count": 1,
+        "test_id": "hw_detection",
+        "display_name": "Hardware detection",
+        "preset": None,
+        "profile": "check",
+        "scope": "required",
+        "status": "passed",
+        "status_reason": "ok",
+        "return_code": 0,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:00:01Z",
+        "duration_seconds": 1.0,
+        "command": [],
+        "artifacts": [],
+        "ansible_recap": {},
+    }
+    (step_dir / "001-pass01-hw_detection.result.json").write_text(
+        json.dumps(step_payload) + "\n",
+        encoding="utf-8",
+    )
+    summary = {
+        "schema_version": 1,
+        "runner_version": "test",
+        "preset": None,
+        "profile": "check",
+        "inventory": "127.0.0.1,",
+        "connection": "local",
+        "repeat": 1,
+        "status": "passed",
+        "run_verdict": "passed",
+        "certification_ready": True,
+        "result_contract": {
+            "schema_version": 1,
+            "verdict": "passed",
+            "certification_ready": True,
+            "review_required": False,
+            "blocking_reasons": [],
+            "review_notes": [],
+        },
+        "interrupted": False,
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:00:01Z",
+        "paths": {"run_id": "fixture", "sandbox_dir": str(sandbox), "runner_dir": str(runner)},
+        "manual_tests": {},
+        "required_unexercised": [],
+        "sut_system": {"title": "Fixture SUT", "facts": [{"label": "Source", "value": "fixture"}]},
+        "controller_system": {"title": "Fixture controller", "facts": []},
+        "results": [
+            {
+                "step": 1,
+                "pass_index": 1,
+                "test_id": "hw_detection",
+                "scope": "required",
+                "status": "passed",
+                "status_reason": "ok",
+                "return_code": 0,
+                "duration_seconds": 1.0,
+                "artifacts": [],
+                "ansible_recap": {},
+            }
+        ],
+    }
+    (runner / "run.summary.json").write_text(json.dumps(summary) + "\n", encoding="utf-8")
+
+
 class SubmissionManifestTests(unittest.TestCase):
     def test_runner_writes_submission_manifest(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -44,6 +135,20 @@ class SubmissionManifestTests(unittest.TestCase):
                 if path.endswith(".console.log")
             )
         )
+
+    def test_fixture_public_submission_manifest_validates_cleanly(self) -> None:
+        with TemporaryDirectory() as tmp:
+            sandbox = Path(tmp) / "fixture-run"
+            write_public_submission_fixture(sandbox)
+            manifest_path = write_submission_manifest(sandbox)
+
+            report = validate_submission(sandbox)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(report.ok)
+        self.assertFalse(report.warnings)
+        self.assertEqual(manifest["run"]["run_verdict"], "passed")
+        self.assertTrue(manifest["run"]["certification_ready"])
 
     def test_build_manifest_accepts_runner_directory(self) -> None:
         with TemporaryDirectory() as tmp:
