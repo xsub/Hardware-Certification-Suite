@@ -2,6 +2,8 @@
 
 The `gpu_burn` test is an optional NVIDIA GPU stress test based on the open
 source [GPU Burn](https://github.com/wilicc/gpu-burn) workload.
+It is optional accelerator/stability evidence, not part of the core
+certification preset unless the Certification SIG creates such a profile.
 
 It runs only when the NVIDIA driver/runtime is already installed and
 `nvidia-smi` can list GPUs. If NVIDIA support is not present, the test emits an

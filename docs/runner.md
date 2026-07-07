@@ -318,6 +318,12 @@ HCS does not install these drivers automatically today; it detects the driver
 state, records `unsupported` when `nvidia-smi` is missing, and points the
 operator at the native AlmaLinux setup path.
 
+`gpu_burn` and `ai_llm` are optional accelerator evidence. Keep them outside
+core certification submissions unless the SIG defines an accelerator or
+datacenter profile. For AI benchmark evidence that may be submitted for review,
+set `ai_llm_submission_evidence=true` and provide model/source/binary
+provenance, including `ai_llm_model_sha256`.
+
 If `snapd` is already available on the SUT, GPU Burn can also be supplied by
 the Snap Store package. The runner only enables this when the selected preset
 asks for it:

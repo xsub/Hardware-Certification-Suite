@@ -16,6 +16,7 @@ THREADS=${HCS_AI_LLM_THREADS:-}
 BACKEND=${HCS_AI_LLM_BACKEND:-auto}
 GPU_LAYERS=${HCS_AI_LLM_GPU_LAYERS:-99}
 CMAKE_EXTRA=${HCS_AI_LLM_CMAKE_EXTRA:-}
+SUBMISSION_EVIDENCE=${HCS_AI_LLM_SUBMISSION_EVIDENCE:-false}
 
 MODEL=${HCS_AI_LLM_MODEL:-}
 MODEL_URL=${HCS_AI_LLM_MODEL_URL:-https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf}
@@ -31,6 +32,7 @@ SOURCE_URL=${HCS_AI_LLM_SOURCE_URL:-https://github.com/ggml-org/llama.cpp.git}
 SOURCE_REF=${HCS_AI_LLM_SOURCE_REF:-b9601}
 SOURCE_DIR=${HCS_AI_LLM_SOURCE_DIR:-/tmp/hcs-ai-llm/llama.cpp}
 BINARY=${HCS_AI_LLM_BINARY:-${SOURCE_DIR}/build/bin/llama-bench}
+BINARY_SHA256=${HCS_AI_LLM_BINARY_SHA256:-}
 BUILD_FROM_SOURCE=${HCS_AI_LLM_BUILD_FROM_SOURCE:-true}
 
 LOG_FILE=${HCS_AI_LLM_LOG_FILE:-/tmp/hcs-ai-llm/ai-llm.log}
@@ -97,6 +99,7 @@ function write_result() {
   "build_mode": $(json_string "$BUILD_MODE"),
   "model": $(json_string "$MODEL_PATH"),
   "model_source": $(json_string "$MODEL_SOURCE"),
+  "model_sha256": $(json_string "$MODEL_SHA256"),
   "prompt_tokens": $(json_number "$PROMPT_TOKENS"),
   "gen_tokens": $(json_number "$GEN_TOKENS"),
   "repetitions": $(json_number "$REPETITIONS"),
@@ -106,8 +109,10 @@ function write_result() {
   "gen_tokens_per_second": $(json_number "$tg_ts"),
   "gen_tokens_per_second_stddev": $(json_number "$tg_sd"),
   "binary": $(json_string "$BINARY"),
+  "binary_sha256": $(json_string "$BINARY_SHA256"),
   "source_ref": $(json_string "$SOURCE_REF"),
   "source_commit": $(json_string "$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || true)"),
+  "submission_evidence": $(json_string "$SUBMISSION_EVIDENCE"),
   "log_file": $(json_string "$LOG_FILE"),
   "bench_json_file": $(json_string "$BENCH_JSON_FILE")
 }
@@ -127,6 +132,29 @@ function fail() {
   log "HCS_FAILED: $reason"
   write_result "failed" "$reason" "$rc"
   exit "$rc"
+}
+
+function verify_sha256() {
+  local path=$1 expected=$2 label=$3 actual
+  [ -n "$expected" ] || return 0
+  actual=$(sha256sum "$path" | awk '{print $1}')
+  if [ "$actual" != "$expected" ]; then
+    fail "$label sha256 mismatch for $path (expected $expected, got $actual)" 3
+  fi
+  log "$label sha256 verified: $actual"
+}
+
+function enforce_submission_evidence() {
+  is_true "$SUBMISSION_EVIDENCE" || return
+  [ -n "$MODEL_SHA256" ] || fail "ai_llm_submission_evidence=true requires ai_llm_model_sha256" 4
+  case "$(lower "$SOURCE_REF")" in
+    ""|head|main|master)
+      fail "ai_llm_submission_evidence=true requires a pinned ai_llm_source_ref, not '$SOURCE_REF'" 4
+      ;;
+  esac
+  if ! is_true "$BUILD_FROM_SOURCE" && [ -z "$BINARY_SHA256" ]; then
+    fail "ai_llm_submission_evidence=true with ai_llm_build_from_source=false requires ai_llm_binary_sha256" 4
+  fi
 }
 
 function resolve_backend() {
@@ -153,6 +181,7 @@ function resolve_backend() {
 function ensure_binary() {
   if [ -x "$BINARY" ]; then
     BUILD_MODE="binary"
+    verify_sha256 "$BINARY" "$BINARY_SHA256" "Binary"
     log "Using llama-bench binary: $BINARY"
     return
   fi
@@ -160,6 +189,7 @@ function ensure_binary() {
   if command -v llama-bench >/dev/null 2>&1; then
     BINARY=$(command -v llama-bench)
     BUILD_MODE="binary"
+    verify_sha256 "$BINARY" "$BINARY_SHA256" "Binary"
     log "Using llama-bench command on PATH: $BINARY"
     return
   fi
@@ -306,6 +336,7 @@ PY
 }
 
 resolve_backend
+enforce_submission_evidence
 ensure_binary
 ensure_model
 

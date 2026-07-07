@@ -128,6 +128,39 @@ def run_preflight(options: RunnerOptions) -> PreflightReport:
                 )
             )
 
+    accelerator_tests = tests.intersection({"gpu_burn", "ai_llm"})
+    if accelerator_tests:
+        checks.append(
+            check(
+                "accelerator",
+                "warning",
+                f"{', '.join(sorted(accelerator_tests))} is optional accelerator evidence, not core certification scope",
+            )
+        )
+    if "ai_llm" in tests:
+        ai_extra = {
+            **options.extra_vars,
+            **options.test_extra_vars.get("ai_llm", {}),
+            **options.cli_extra_vars,
+        }
+        if ai_extra.get("ai_llm_submission_evidence") in {"1", "true", "True", "yes", "on"}:
+            if not ai_extra.get("ai_llm_model_sha256"):
+                checks.append(
+                    check(
+                        "ai_llm",
+                        "error",
+                        "ai_llm_submission_evidence=true requires ai_llm_model_sha256",
+                    )
+                )
+        elif not ai_extra.get("ai_llm_model_sha256"):
+            checks.append(
+                check(
+                    "ai_llm",
+                    "warning",
+                    "AI benchmark has no model checksum; keep it experimental or set ai_llm_submission_evidence=true with ai_llm_model_sha256",
+                )
+            )
+
     if (options.paths.runner_dir / "run.summary.json").exists():
         validation = validate_submission(options.paths.sandbox_dir)
         if validation.ok:
